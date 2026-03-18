@@ -1,0 +1,16 @@
+# Room Name, Room Number, Floor
+# Floor 1 - Friend Center
+Friend 101, 101, 1
+Friend 103, 103, 1
+Friend 105, 105, 1
+Friend 108, 108, 1
+Friend 110, 110, 1
+# Floor 2 - Friend Center
+Friend 201, 201, 2
+Friend 203, 203, 2
+Friend 205, 205, 2
+Friend 206, 206, 2
+# Floor 3 - Sherrerd Hall
+Sherrerd 301, 301, 3
+Sherrerd 303, 303, 3
+Sherrerd 305, 305, 3

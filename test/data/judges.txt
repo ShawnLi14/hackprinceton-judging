@@ -1,0 +1,21 @@
+# Judge Name, Access Code
+Alice Chen, JUDGE-001
+Bob Martinez, JUDGE-002
+Carol Williams, JUDGE-003
+David Kim, JUDGE-004
+Emma Johnson, JUDGE-005
+Frank Liu, JUDGE-006
+Grace Patel, JUDGE-007
+Henry Wilson, JUDGE-008
+Iris Thompson, JUDGE-009
+James Garcia, JUDGE-010
+Karen Lee, JUDGE-011
+Larry Brown, JUDGE-012
+Maria Rodriguez, JUDGE-013
+Nathan Davis, JUDGE-014
+Olivia Moore, JUDGE-015
+Patrick Taylor, JUDGE-016
+Quinn Anderson, JUDGE-017
+Rachel Thomas, JUDGE-018
+Steven White, JUDGE-019
+Tracy Harris, JUDGE-020

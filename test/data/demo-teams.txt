@@ -1,0 +1,37 @@
+# Team Name, Project Name, Table Number, Room Name
+# Floor 1 - Friend 101 (5 teams)
+Arc Pioneers, Skill Swap, T1, Friend 101
+Flux Phoenix, Transit App, T2, Friend 101
+Neon Hackers, Reading List, T3, Friend 101
+Stellar Force, Smart Calendar, T4, Friend 101
+Zen Grid, Meal Prep, T5, Friend 101
+# Floor 1 - Friend 103 (5 teams)
+Apex Makers, Lost & Found, T1, Friend 103
+Delta Pioneers, Food Finder, T2, Friend 103
+Neural Team, Parking Finder, T3, Friend 103
+Cosmic Force, Eco Monitor, T4, Friend 103
+Neon Grid, Skill Swap, T5, Friend 103
+# Floor 2 - Friend 201 (5 teams)
+Ember Team, AI Assistant, T1, Friend 201
+Zen Dynamics, Parking Finder, T2, Friend 201
+Apex Force, AR Navigator, T3, Friend 201
+Neural Force, Chat Platform, T4, Friend 201
+Alpha Creators, Mental Health App, T5, Friend 201
+# Floor 2 - Friend 203 (5 teams)
+Fusion Innovators, Carbon Calculator, T1, Friend 203
+Digital Node, Study Buddy, T2, Friend 203
+Solar Systems, Habit Builder, T3, Friend 203
+Quantum Matrix, Recipe AI, T4, Friend 203
+Neural Core, Commute Optimizer, T5, Friend 203
+# Floor 3 - Sherrerd 301 (5 teams)
+Pixel Builders, AR Navigator, T1, Sherrerd 301
+Ember Hackers, Volunteer Hub, T2, Sherrerd 301
+Astro Builders, Parking Finder, T3, Sherrerd 301
+Nova Builders, Reading List, T4, Sherrerd 301
+Digital Coders, AI Assistant, T5, Sherrerd 301
+# Floor 3 - Sherrerd 303 (5 teams)
+Drift Coders, Donation Platform, T1, Sherrerd 303
+Ultra Devs, Virtual Tutor, T2, Sherrerd 303
+Vibe Systems, Music Generator, T3, Sherrerd 303
+Apex Collective, Language Tutor, T4, Sherrerd 303
+Sonic Works, Carbon Calculator, T5, Sherrerd 303
