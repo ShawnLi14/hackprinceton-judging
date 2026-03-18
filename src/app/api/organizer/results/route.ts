@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       id: team.id,
       name: team.name,
       project_name: team.project_name,
-      table_number: team.table_number,
+      team_number: team.team_number,
       room_name: team.room?.name || 'Unknown',
       floor: team.room?.floor || 0,
       times_judged: team.times_judged,

@@ -296,7 +296,7 @@ function DashboardContent() {
                                   {st.team?.name || 'Unknown'}
                                 </div>
                                 <div className="text-muted-foreground">
-                                  {st.team?.room?.name} · Table {st.team?.table_number}
+                                  {st.team?.room?.name} · #{st.team?.team_number}
                                 </div>
                               </div>
                             </div>
@@ -322,7 +322,7 @@ function DashboardContent() {
                       <th className="text-left p-3 font-medium">Team</th>
                       <th className="text-left p-3 font-medium">Project</th>
                       <th className="text-left p-3 font-medium">Room</th>
-                      <th className="text-left p-3 font-medium">Table</th>
+                      <th className="text-left p-3 font-medium">Team #</th>
                       <th className="text-center p-3 font-medium">Floor</th>
                       <th className="text-center p-3 font-medium">Times Judged</th>
                       <th className="text-left p-3 font-medium">Status</th>
@@ -344,7 +344,7 @@ function DashboardContent() {
                             <td className="p-3 font-medium">{team.name}</td>
                             <td className="p-3 text-muted-foreground">{team.project_name || '—'}</td>
                             <td className="p-3">{team.room?.name || '?'}</td>
-                            <td className="p-3">{team.table_number}</td>
+                            <td className="p-3">{team.team_number}</td>
                             <td className="p-3 text-center">{team.room?.floor || '?'}</td>
                             <td className="p-3 text-center">
                               <Badge variant={

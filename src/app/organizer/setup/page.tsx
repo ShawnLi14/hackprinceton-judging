@@ -38,7 +38,7 @@ function SetupPageContent() {
 
   // Form states
   const [newRoom, setNewRoom] = useState({ name: '', room_number: '', floor: '1' });
-  const [newTeam, setNewTeam] = useState({ name: '', project_name: '', table_number: '', room_name: '' });
+  const [newTeam, setNewTeam] = useState({ name: '', project_name: '', team_number: '', room_name: '' });
   const [newJudge, setNewJudge] = useState({ name: '', access_code: '' });
   const [bulkTeams, setBulkTeams] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
@@ -90,7 +90,7 @@ function SetupPageContent() {
   };
 
   const addTeam = async () => {
-    if (!newTeam.name.trim() || !newTeam.table_number || !newTeam.room_name || !eventId) return;
+    if (!newTeam.name.trim() || !newTeam.team_number || !newTeam.room_name || !eventId) return;
     const room_id = resolveRoomId(newTeam.room_name);
     if (!room_id) return;
     await fetch('/api/organizer/teams', {
@@ -100,11 +100,11 @@ function SetupPageContent() {
         event_id: eventId,
         name: newTeam.name,
         project_name: newTeam.project_name || null,
-        table_number: newTeam.table_number,
+        team_number: newTeam.team_number,
         room_id,
       }),
     });
-    setNewTeam({ name: '', project_name: '', table_number: '', room_name: '' });
+    setNewTeam({ name: '', project_name: '', team_number: '', room_name: '' });
     loadData();
   };
 
@@ -120,12 +120,12 @@ function SetupPageContent() {
     const errors: string[] = [];
     const teamsToCreate = lines.map((line, i) => {
       const parts = line.split(',').map(p => p.trim());
-      let name: string, project_name: string | null, table_number: string, roomName: string;
+      let name: string, project_name: string | null, team_number: string, roomName: string;
       if (parts.length === 3) {
-        [name, table_number, roomName] = parts;
+        [name, team_number, roomName] = parts;
         project_name = null;
       } else if (parts.length >= 4) {
-        [name, project_name, table_number, roomName] = parts;
+        [name, project_name, team_number, roomName] = parts;
       } else {
         return null;
       }
@@ -134,7 +134,7 @@ function SetupPageContent() {
         errors.push(`Line ${i + 1}: room "${roomName}" not found`);
         return null;
       }
-      return { event_id: eventId, name, project_name, table_number, room_id };
+      return { event_id: eventId, name, project_name, team_number, room_id };
     }).filter(Boolean);
 
     if (errors.length > 0) {
@@ -362,10 +362,10 @@ function SetupPageContent() {
           <CardContent className="space-y-4">
             {showBulkImport ? (
               <div className="space-y-2">
-                <Label className="text-xs">CSV: name, project, table, room name (one per line)</Label>
+                <Label className="text-xs">CSV: name, project, team #, room name (one per line)</Label>
                 <textarea
                   className="w-full rounded-md border px-3 py-2 text-sm min-h-[120px] font-mono"
-                  placeholder={`Team Alpha, AI Project, T1, ${rooms[0]?.name || 'Room A'}\nTeam Beta, Web App, T2, ${rooms[0]?.name || 'Room A'}`}
+                  placeholder={`Team Alpha, AI Project, 1, ${rooms[0]?.name || 'Room A'}\nTeam Beta, Web App, 2, ${rooms[0]?.name || 'Room A'}`}
                   value={bulkTeams}
                   onChange={e => setBulkTeams(e.target.value)}
                 />
@@ -387,9 +387,9 @@ function SetupPageContent() {
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <Input
-                    placeholder="Table #"
-                    value={newTeam.table_number}
-                    onChange={e => setNewTeam(p => ({ ...p, table_number: e.target.value }))}
+                    placeholder="Team #"
+                    value={newTeam.team_number}
+                    onChange={e => setNewTeam(p => ({ ...p, team_number: e.target.value }))}
                     className="text-sm"
                   />
                   <Select value={newTeam.room_name} onValueChange={(v) => setNewTeam(p => ({ ...p, room_name: v ?? '' }))}>
@@ -415,7 +415,7 @@ function SetupPageContent() {
                   <div className="min-w-0 flex-1">
                     <span className="font-medium truncate block">{team.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {team.room?.name || '?'} · Table {team.table_number}
+                      {team.room?.name || '?'} · #{team.team_number}
                     </span>
                   </div>
                   <Button size="sm" variant="ghost" className="text-destructive h-7" onClick={() => deleteTeam(team.id)}>×</Button>
@@ -556,7 +556,7 @@ function SetupPageContent() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div className="grid grid-cols-3 gap-4 text-center">
               <div>
                 <p className="text-2xl font-bold">{event?.set_size}</p>
                 <p className="text-xs text-muted-foreground">Teams per Set</p>
@@ -568,10 +568,6 @@ function SetupPageContent() {
               <div>
                 <p className="text-2xl font-bold">{event?.max_judging_minutes}m</p>
                 <p className="text-xs text-muted-foreground">Max Time per Set</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{Math.ceil((teams.length * (event?.target_judgings_per_team || 3)) / (judges.length * (event?.set_size || 5))) || '?'}</p>
-                <p className="text-xs text-muted-foreground">Estimated Rounds</p>
               </div>
             </div>
           )}

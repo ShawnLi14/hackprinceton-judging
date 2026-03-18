@@ -10,7 +10,7 @@ interface TeamResult {
   id: string;
   name: string;
   project_name: string | null;
-  table_number: string;
+  team_number: string;
   room_name: string;
   floor: number;
   times_judged: number;
@@ -34,9 +34,9 @@ function ResultsContent() {
   }, [eventId]);
 
   const exportCSV = () => {
-    const header = 'Rank,Team,Project,Score,Times Judged,Num Rankings,Room,Floor,Table\n';
+    const header = 'Rank,Team,Project,Score,Times Judged,Num Rankings,Room,Floor,Team #\n';
     const rows = results.map((r, idx) =>
-      `${idx + 1},"${r.name}","${r.project_name || ''}",${r.score?.toFixed(1) || 'N/A'},${r.times_judged},${r.num_rankings},"${r.room_name}",${r.floor},${r.table_number}`
+      `${idx + 1},"${r.name}","${r.project_name || ''}",${r.score?.toFixed(1) || 'N/A'},${r.times_judged},${r.num_rankings},"${r.room_name}",${r.floor},${r.team_number}`
     ).join('\n');
 
     const blob = new Blob([header + rows], { type: 'text/csv' });

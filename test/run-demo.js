@@ -163,7 +163,7 @@ class DemoJudgeBot {
       const teams = result.set.judging_set_teams || [];
       const teamNames = teams
         .sort((a, b) => a.visit_order - b.visit_order)
-        .map(st => `${st.team?.name || '?'} (${st.team?.room?.name} ${st.team?.table_number})`)
+        .map(st => `${st.team?.name || '?'} (${st.team?.room?.name} #${st.team?.team_number})`)
         .join(', ');
 
       this.log(`Got set with ${teams.length} teams: ${teamNames}`);
@@ -185,9 +185,9 @@ class DemoJudgeBot {
       const st = teams[i];
       const teamName = st.team?.name || 'Unknown';
       const room = st.team?.room?.name || '?';
-      const table = st.team?.table_number || '?';
+      const teamNum = st.team?.team_number || '?';
 
-      this.log(`  Visiting ${i + 1}/${teams.length}: ${teamName} at ${room} ${table}...`);
+      this.log(`  Visiting ${i + 1}/${teams.length}: ${teamName} at ${room} #${teamNum}...`);
 
       // Simulate walking + judging time
       const delay = randBetween(VISIT_DELAY_MIN, VISIT_DELAY_MAX);

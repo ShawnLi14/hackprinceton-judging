@@ -33,7 +33,7 @@ CREATE TABLE teams (
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   project_name TEXT,
-  table_number TEXT NOT NULL,
+  team_number TEXT NOT NULL,
   room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
   times_judged INTEGER NOT NULL DEFAULT 0,
   is_active BOOLEAN NOT NULL DEFAULT true,

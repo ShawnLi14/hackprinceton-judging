@@ -353,7 +353,7 @@ function JudgePageContent() {
                         Room {st.team?.room?.name} (#{st.team?.room?.room_number})
                       </Badge>
                       <Badge variant="outline" className="text-xs">
-                        Table {st.team?.table_number}
+                        #{st.team?.team_number}
                       </Badge>
                     </div>
                   </div>
