@@ -40,6 +40,8 @@ function SetupPageContent() {
   const [newRoom, setNewRoom] = useState({ name: '', room_number: '', floor: '1' });
   const [newTeam, setNewTeam] = useState({ name: '', project_name: '', team_number: '', room_name: '' });
   const [newJudge, setNewJudge] = useState({ name: '', access_code: '' });
+  const [bulkRooms, setBulkRooms] = useState('');
+  const [showBulkRoomImport, setShowBulkRoomImport] = useState(false);
   const [bulkTeams, setBulkTeams] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [bulkJudges, setBulkJudges] = useState('');
@@ -86,6 +88,34 @@ function SetupPageContent() {
       }),
     });
     setNewRoom({ name: '', room_number: '', floor: '1' });
+    loadData();
+  };
+
+  const bulkImportRooms = async () => {
+    if (!bulkRooms.trim() || !eventId) return;
+    const lines = bulkRooms.trim().split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+    const roomsToCreate = lines.map(line => {
+      const parts = line.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        return {
+          event_id: eventId,
+          name: parts[0],
+          room_number: parseInt(parts[1]) || 0,
+          floor: parseInt(parts[2]) || 1,
+        };
+      }
+      return null;
+    }).filter(Boolean);
+
+    if (roomsToCreate.length === 0) return;
+
+    await fetch('/api/organizer/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(roomsToCreate),
+    });
+    setBulkRooms('');
+    setShowBulkRoomImport(false);
     loadData();
   };
 
@@ -288,46 +318,66 @@ function SetupPageContent() {
         {/* ROOMS */}
         <Card>
           <CardHeader>
-            <CardTitle>Rooms</CardTitle>
-            <CardDescription>
-              Physical locations. Closer room numbers = closer proximity.
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Rooms</CardTitle>
+                <CardDescription>
+                  Physical locations. Closer room numbers = closer proximity.
+                </CardDescription>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setShowBulkRoomImport(!showBulkRoomImport)}>
+                {showBulkRoomImport ? 'Single' : 'Bulk Import'}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label className="text-xs">Name</Label>
-                  <Input
-                    placeholder="Room A"
-                    value={newRoom.name}
-                    onChange={e => setNewRoom(p => ({ ...p, name: e.target.value }))}
-                    className="text-sm"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Number</Label>
-                  <Input
-                    type="number"
-                    placeholder="101"
-                    value={newRoom.room_number}
-                    onChange={e => setNewRoom(p => ({ ...p, room_number: e.target.value }))}
-                    className="text-sm"
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs">Floor</Label>
-                  <Input
-                    type="number"
-                    placeholder="1"
-                    value={newRoom.floor}
-                    onChange={e => setNewRoom(p => ({ ...p, floor: e.target.value }))}
-                    className="text-sm"
-                  />
-                </div>
+            {showBulkRoomImport ? (
+              <div className="space-y-2">
+                <Label className="text-xs">One per line: name, room number, floor</Label>
+                <textarea
+                  className="w-full rounded-md border px-3 py-2 text-sm min-h-[120px] font-mono"
+                  placeholder={`Friend 101, 101, 1\nFriend 201, 201, 2\nSherrerd 301, 301, 3`}
+                  value={bulkRooms}
+                  onChange={e => setBulkRooms(e.target.value)}
+                />
+                <Button onClick={bulkImportRooms} size="sm" className="w-full">Import Rooms</Button>
               </div>
-              <Button onClick={addRoom} size="sm" className="w-full">Add Room</Button>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <Label className="text-xs">Name</Label>
+                    <Input
+                      placeholder="Room A"
+                      value={newRoom.name}
+                      onChange={e => setNewRoom(p => ({ ...p, name: e.target.value }))}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Number</Label>
+                    <Input
+                      type="number"
+                      placeholder="101"
+                      value={newRoom.room_number}
+                      onChange={e => setNewRoom(p => ({ ...p, room_number: e.target.value }))}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Floor</Label>
+                    <Input
+                      type="number"
+                      placeholder="1"
+                      value={newRoom.floor}
+                      onChange={e => setNewRoom(p => ({ ...p, floor: e.target.value }))}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+                <Button onClick={addRoom} size="sm" className="w-full">Add Room</Button>
+              </div>
+            )}
 
             <Separator />
 
