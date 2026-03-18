@@ -44,6 +44,34 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(data);
 }
 
+// PATCH: update event configuration
+export async function PATCH(req: NextRequest) {
+  const body = await req.json();
+  const eventId = body.id;
+  if (!eventId) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+  const updates: Record<string, unknown> = {};
+  if (body.name !== undefined) updates.name = body.name;
+  if (body.set_size !== undefined) updates.set_size = body.set_size;
+  if (body.target_judgings_per_team !== undefined) updates.target_judgings_per_team = body.target_judgings_per_team;
+  if (body.max_judging_minutes !== undefined) updates.max_judging_minutes = body.max_judging_minutes;
+  if (body.admin_code !== undefined) updates.admin_code = body.admin_code;
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+  }
+
+  const { data, error } = await supabase
+    .from('events')
+    .update(updates)
+    .eq('id', eventId)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json(data);
+}
+
 // DELETE: delete an event (cascades to all related data)
 export async function DELETE(req: NextRequest) {
   const eventId = req.nextUrl.searchParams.get('id');

@@ -38,10 +38,17 @@ function SetupPageContent() {
 
   // Form states
   const [newRoom, setNewRoom] = useState({ name: '', room_number: '', floor: '1' });
-  const [newTeam, setNewTeam] = useState({ name: '', project_name: '', table_number: '', room_id: '' });
+  const [newTeam, setNewTeam] = useState({ name: '', project_name: '', table_number: '', room_name: '' });
   const [newJudge, setNewJudge] = useState({ name: '', access_code: '' });
   const [bulkTeams, setBulkTeams] = useState('');
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkJudges, setBulkJudges] = useState('');
+  const [showBulkJudgeImport, setShowBulkJudgeImport] = useState(false);
+
+  // Event config editing
+  const [editingConfig, setEditingConfig] = useState(false);
+  const [configForm, setConfigForm] = useState({ set_size: '', target_judgings_per_team: '', max_judging_minutes: '', name: '' });
+  const [savingConfig, setSavingConfig] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!eventId) return;
@@ -83,7 +90,9 @@ function SetupPageContent() {
   };
 
   const addTeam = async () => {
-    if (!newTeam.name.trim() || !newTeam.table_number || !newTeam.room_id || !eventId) return;
+    if (!newTeam.name.trim() || !newTeam.table_number || !newTeam.room_name || !eventId) return;
+    const room_id = resolveRoomId(newTeam.room_name);
+    if (!room_id) return;
     await fetch('/api/organizer/teams', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -92,28 +101,46 @@ function SetupPageContent() {
         name: newTeam.name,
         project_name: newTeam.project_name || null,
         table_number: newTeam.table_number,
-        room_id: newTeam.room_id,
+        room_id,
       }),
     });
-    setNewTeam({ name: '', project_name: '', table_number: '', room_id: '' });
+    setNewTeam({ name: '', project_name: '', table_number: '', room_name: '' });
     loadData();
+  };
+
+  const resolveRoomId = (roomName: string): string | null => {
+    const normalized = roomName.toLowerCase().trim();
+    const room = rooms.find(r => r.name.toLowerCase().trim() === normalized);
+    return room?.id ?? null;
   };
 
   const bulkImportTeams = async () => {
     if (!bulkTeams.trim() || !eventId) return;
-    // Format: team_name, table_number, room_id (one per line)
-    // Or: team_name, project_name, table_number, room_id
-    const lines = bulkTeams.trim().split('\n').filter(l => l.trim());
-    const teamsToCreate = lines.map(line => {
+    const lines = bulkTeams.trim().split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+    const errors: string[] = [];
+    const teamsToCreate = lines.map((line, i) => {
       const parts = line.split(',').map(p => p.trim());
+      let name: string, project_name: string | null, table_number: string, roomName: string;
       if (parts.length === 3) {
-        return { event_id: eventId, name: parts[0], table_number: parts[1], room_id: parts[2] };
+        [name, table_number, roomName] = parts;
+        project_name = null;
       } else if (parts.length >= 4) {
-        return { event_id: eventId, name: parts[0], project_name: parts[1], table_number: parts[2], room_id: parts[3] };
+        [name, project_name, table_number, roomName] = parts;
+      } else {
+        return null;
       }
-      return null;
+      const room_id = resolveRoomId(roomName);
+      if (!room_id) {
+        errors.push(`Line ${i + 1}: room "${roomName}" not found`);
+        return null;
+      }
+      return { event_id: eventId, name, project_name, table_number, room_id };
     }).filter(Boolean);
 
+    if (errors.length > 0) {
+      alert(`Some lines have unknown rooms:\n${errors.join('\n')}\n\nMake sure rooms are created first and names match exactly.`);
+      return;
+    }
     if (teamsToCreate.length === 0) return;
 
     await fetch('/api/organizer/teams', {
@@ -139,6 +166,64 @@ function SetupPageContent() {
     });
     setNewJudge({ name: '', access_code: '' });
     loadData();
+  };
+
+  const bulkImportJudges = async () => {
+    if (!bulkJudges.trim() || !eventId) return;
+    const lines = bulkJudges.trim().split('\n').filter(l => l.trim());
+    const judgesToCreate = lines.map(line => {
+      const parts = line.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        return { event_id: eventId, name: parts[0], access_code: parts[1] || undefined };
+      }
+      return { event_id: eventId, name: parts[0] };
+    }).filter(j => j.name);
+
+    if (judgesToCreate.length === 0) return;
+
+    await fetch('/api/organizer/judges', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(judgesToCreate),
+    });
+    setBulkJudges('');
+    setShowBulkJudgeImport(false);
+    loadData();
+  };
+
+  const startEditingConfig = () => {
+    if (!event) return;
+    setConfigForm({
+      name: event.name,
+      set_size: String(event.set_size),
+      target_judgings_per_team: String(event.target_judgings_per_team),
+      max_judging_minutes: String(event.max_judging_minutes),
+    });
+    setEditingConfig(true);
+  };
+
+  const saveConfig = async () => {
+    if (!eventId) return;
+    setSavingConfig(true);
+    try {
+      const res = await fetch('/api/events', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: eventId,
+          name: configForm.name,
+          set_size: parseInt(configForm.set_size) || 5,
+          target_judgings_per_team: parseInt(configForm.target_judgings_per_team) || 3,
+          max_judging_minutes: parseInt(configForm.max_judging_minutes) || 20,
+        }),
+      });
+      if (res.ok) {
+        setEditingConfig(false);
+        loadData();
+      }
+    } finally {
+      setSavingConfig(false);
+    }
   };
 
   const deleteRoom = async (id: string) => {
@@ -277,10 +362,10 @@ function SetupPageContent() {
           <CardContent className="space-y-4">
             {showBulkImport ? (
               <div className="space-y-2">
-                <Label className="text-xs">CSV: name, project, table, room_id (one per line)</Label>
+                <Label className="text-xs">CSV: name, project, table, room name (one per line)</Label>
                 <textarea
                   className="w-full rounded-md border px-3 py-2 text-sm min-h-[120px] font-mono"
-                  placeholder={`Team Alpha, AI Project, T1, ${rooms[0]?.id || 'room-id'}\nTeam Beta, Web App, T2, ${rooms[0]?.id || 'room-id'}`}
+                  placeholder={`Team Alpha, AI Project, T1, ${rooms[0]?.name || 'Room A'}\nTeam Beta, Web App, T2, ${rooms[0]?.name || 'Room A'}`}
                   value={bulkTeams}
                   onChange={e => setBulkTeams(e.target.value)}
                 />
@@ -307,13 +392,13 @@ function SetupPageContent() {
                     onChange={e => setNewTeam(p => ({ ...p, table_number: e.target.value }))}
                     className="text-sm"
                   />
-                  <Select value={newTeam.room_id} onValueChange={(v) => setNewTeam(p => ({ ...p, room_id: v ?? '' }))}>
+                  <Select value={newTeam.room_name} onValueChange={(v) => setNewTeam(p => ({ ...p, room_name: v ?? '' }))}>
                     <SelectTrigger className="text-sm">
                       <SelectValue placeholder="Room" />
                     </SelectTrigger>
                     <SelectContent>
                       {rooms.map(room => (
-                        <SelectItem key={room.id} value={room.id}>{room.name}</SelectItem>
+                        <SelectItem key={room.id} value={room.name}>{room.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -344,27 +429,45 @@ function SetupPageContent() {
         {/* JUDGES */}
         <Card>
           <CardHeader>
-            <CardTitle>Judges ({judges.length})</CardTitle>
-            <CardDescription>
-              Each judge gets a unique access code
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Judges ({judges.length})</CardTitle>
+                <CardDescription>Each judge gets a unique access code</CardDescription>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setShowBulkJudgeImport(!showBulkJudgeImport)}>
+                {showBulkJudgeImport ? 'Single' : 'Bulk Import'}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                placeholder="Judge Name"
-                value={newJudge.name}
-                onChange={e => setNewJudge(p => ({ ...p, name: e.target.value }))}
-                className="text-sm"
-              />
-              <Input
-                placeholder="Access Code (auto-generated if empty)"
-                value={newJudge.access_code}
-                onChange={e => setNewJudge(p => ({ ...p, access_code: e.target.value.toUpperCase() }))}
-                className="text-sm font-mono"
-              />
-              <Button onClick={addJudge} size="sm" className="w-full">Add Judge</Button>
-            </div>
+            {showBulkJudgeImport ? (
+              <div className="space-y-2">
+                <Label className="text-xs">One per line: name, access_code (code is optional)</Label>
+                <textarea
+                  className="w-full rounded-md border px-3 py-2 text-sm min-h-[120px] font-mono"
+                  placeholder={`Alice Johnson, ALICE1\nBob Smith, BOB42\nCharlie Brown`}
+                  value={bulkJudges}
+                  onChange={e => setBulkJudges(e.target.value)}
+                />
+                <Button onClick={bulkImportJudges} size="sm" className="w-full">Import Judges</Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Input
+                  placeholder="Judge Name"
+                  value={newJudge.name}
+                  onChange={e => setNewJudge(p => ({ ...p, name: e.target.value }))}
+                  className="text-sm"
+                />
+                <Input
+                  placeholder="Access Code (auto-generated if empty)"
+                  value={newJudge.access_code}
+                  onChange={e => setNewJudge(p => ({ ...p, access_code: e.target.value.toUpperCase() }))}
+                  className="text-sm font-mono"
+                />
+                <Button onClick={addJudge} size="sm" className="w-full">Add Judge</Button>
+              </div>
+            )}
 
             <Separator />
 
@@ -387,30 +490,91 @@ function SetupPageContent() {
       {/* Event Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Event Configuration</CardTitle>
-          <CardDescription>
-            Admin code: <code className="font-mono bg-muted px-1 rounded">{event?.admin_code}</code>
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Event Configuration</CardTitle>
+              <CardDescription>
+                Admin code: <code className="font-mono bg-muted px-1 rounded">{event?.admin_code}</code>
+              </CardDescription>
+            </div>
+            {event?.status === 'setup' && !editingConfig && (
+              <Button size="sm" variant="outline" onClick={startEditingConfig}>Edit</Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold">{event?.set_size}</p>
-              <p className="text-xs text-muted-foreground">Teams per Set</p>
+          {editingConfig ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Event Name</Label>
+                  <Input
+                    value={configForm.name}
+                    onChange={e => setConfigForm(p => ({ ...p, name: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Teams per Set</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={configForm.set_size}
+                    onChange={e => setConfigForm(p => ({ ...p, set_size: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Target Judgings per Team</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={configForm.target_judgings_per_team}
+                    onChange={e => setConfigForm(p => ({ ...p, target_judgings_per_team: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max Minutes per Set</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={configForm.max_judging_minutes}
+                    onChange={e => setConfigForm(p => ({ ...p, max_judging_minutes: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="ghost" onClick={() => setEditingConfig(false)}>Cancel</Button>
+                <Button size="sm" onClick={saveConfig} disabled={savingConfig}>
+                  {savingConfig ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{event?.target_judgings_per_team}</p>
-              <p className="text-xs text-muted-foreground">Target Judgings/Team</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold">{event?.set_size}</p>
+                <p className="text-xs text-muted-foreground">Teams per Set</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{event?.target_judgings_per_team}</p>
+                <p className="text-xs text-muted-foreground">Target Judgings/Team</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{event?.max_judging_minutes}m</p>
+                <p className="text-xs text-muted-foreground">Max Time per Set</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{Math.ceil((teams.length * (event?.target_judgings_per_team || 3)) / (judges.length * (event?.set_size || 5))) || '?'}</p>
+                <p className="text-xs text-muted-foreground">Estimated Rounds</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold">{event?.max_judging_minutes}m</p>
-              <p className="text-xs text-muted-foreground">Max Time per Set</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{Math.ceil((teams.length * (event?.target_judgings_per_team || 3)) / (judges.length * (event?.set_size || 5))) || '?'}</p>
-              <p className="text-xs text-muted-foreground">Estimated Rounds</p>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
