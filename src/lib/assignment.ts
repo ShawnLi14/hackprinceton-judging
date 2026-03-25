@@ -57,7 +57,7 @@ export async function assignNextSet(
 // Submit a completed judging set (Atomic via RPC)
 // ============================================
 // Uses a PostgreSQL function that runs in a single transaction:
-// 1. Saves rankings
+// 1. Saves judge scores and notes
 // 2. Marks set completed
 // 3. Increments times_judged (BEFORE releasing locks!)
 // 4. Releases locks (teams only become available after counts are updated)
@@ -67,16 +67,16 @@ export async function assignNextSet(
 
 export async function submitJudgingSet(
   judgingSetId: string,
-  rankings: { team_id: string; rank: number; notes?: string; is_absent?: boolean }[]
+  evaluations: { team_id: string; score?: number | null; notes?: string; is_absent?: boolean }[]
 ): Promise<boolean> {
   const { error } = await supabase
     .rpc('submit_judging_set', {
       p_set_id: judgingSetId,
-      p_rankings: rankings.map(r => ({
-        team_id: r.team_id,
-        rank: r.rank,
-        notes: r.notes || null,
-        is_absent: r.is_absent || false,
+      p_rankings: evaluations.map(evaluation => ({
+        team_id: evaluation.team_id,
+        rank: evaluation.score ?? null,
+        notes: evaluation.notes || null,
+        is_absent: evaluation.is_absent || false,
       })),
     });
 

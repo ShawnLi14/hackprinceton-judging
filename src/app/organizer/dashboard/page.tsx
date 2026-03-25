@@ -1,9 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 import { Separator } from '@/components/ui/separator';
@@ -128,7 +129,7 @@ function DashboardContent() {
   };
 
   if (!eventId) {
-    return <p>No event selected. <a href="/" className="underline">Go back</a></p>;
+    return <p>No event selected. <Link href="/" className="underline">Go back</Link></p>;
   }
 
   if (loading) {
@@ -140,10 +141,6 @@ function DashboardContent() {
   const activeJudges = judges.filter(j => j.status === 'active').length;
   const idleJudges = judges.filter(j => j.status === 'idle').length;
   const breakJudges = judges.filter(j => j.status === 'on_break').length;
-  const timesJudged = teams.map(t => t.times_judged);
-  const avgJudgings = totalTeams > 0 ? (timesJudged.reduce((a, b) => a + b, 0) / totalTeams).toFixed(1) : '0';
-  const minJudgings = totalTeams > 0 ? Math.min(...timesJudged) : 0;
-  const maxJudgings = totalTeams > 0 ? Math.max(...timesJudged) : 0;
   const targetJudgings = event?.target_judgings_per_team || 3;
   const teamsAtTarget = teams.filter(t => t.times_judged >= targetJudgings).length;
   const totalSetsCompleted = judges.reduce((sum, j) => sum + j.sets_completed, 0);
@@ -168,61 +165,70 @@ function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{event?.name} — Live Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Auto-refreshing every 10s</p>
-        </div>
-        <div className="flex gap-2">
-          <Badge variant={event?.status === 'active' ? 'default' : 'secondary'} className="text-sm">
-            {event?.status}
-          </Badge>
-          {event?.status === 'active' && (
-            <>
-              <Button size="sm" variant="outline" onClick={() => controlEvent('pause')}>Pause</Button>
-              <Button size="sm" variant="destructive" onClick={() => controlEvent('complete')}>End Judging</Button>
-            </>
-          )}
-          {event?.status === 'paused' && (
-            <Button size="sm" onClick={() => controlEvent('start')}>Resume</Button>
-          )}
-        </div>
-      </div>
+      <Card className={`shadow-sm ${event?.status === 'active' ? 'border-emerald-200 bg-emerald-50/40' : 'border-border/60'}`}>
+        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <Badge
+              variant={event?.status === 'active' ? 'default' : 'secondary'}
+              className={event?.status === 'active' ? 'w-fit bg-emerald-600 text-white' : 'w-fit'}
+            >
+              {event?.status}
+            </Badge>
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold text-balance">{event?.name} live dashboard</h1>
+              <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
+                Keep an eye on judge progress, active locks, and event health. The dashboard refreshes automatically every 10 seconds.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {event?.status === 'active' && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => controlEvent('pause')}>Pause event</Button>
+                <Button size="sm" variant="destructive" onClick={() => controlEvent('complete')}>End judging</Button>
+              </>
+            )}
+            {event?.status === 'paused' && (
+              <Button size="sm" onClick={() => controlEvent('start')}>Resume event</Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+        <Card className="border-border/60 shadow-sm">
           <CardContent className="p-4 text-center">
             <p className="text-3xl font-bold">{totalTeams}</p>
             <p className="text-xs text-muted-foreground">Total Teams</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-emerald-200 bg-emerald-50/50 shadow-sm">
           <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold text-green-600">{activeJudges}</p>
+            <p className="text-3xl font-bold text-emerald-700">{activeJudges}</p>
             <p className="text-xs text-muted-foreground">Active Judges</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-border/60 shadow-sm">
+          <CardContent className="p-4 text-center">
+            <p className="text-3xl font-bold">{idleJudges}</p>
+            <p className="text-xs text-muted-foreground">Idle Judges</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60 shadow-sm">
+          <CardContent className="p-4 text-center">
+            <p className="text-3xl font-bold">{breakJudges}</p>
+            <p className="text-xs text-muted-foreground">On Break</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60 shadow-sm">
           <CardContent className="p-4 text-center">
             <p className="text-3xl font-bold">{totalSetsCompleted}</p>
             <p className="text-xs text-muted-foreground">Sets Done</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold">{avgJudgings}</p>
-            <p className="text-xs text-muted-foreground">Avg Judgings</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold">{minJudgings}–{maxJudgings}</p>
-            <p className="text-xs text-muted-foreground">Min–Max</p>
-          </CardContent>
-        </Card>
-        <Card>
+        <Card className="border-border/60 shadow-sm">
           <CardContent className="p-4 text-center">
             <p className="text-3xl font-bold">{teamsAtTarget}/{totalTeams}</p>
             <p className="text-xs text-muted-foreground">At Target ({targetJudgings})</p>
@@ -231,24 +237,24 @@ function DashboardContent() {
       </div>
 
       <Tabs defaultValue="judges">
-        <TabsList>
+        <TabsList variant="line" className="w-fit">
           <TabsTrigger value="judges">Judges ({judges.length})</TabsTrigger>
           <TabsTrigger value="teams">Teams ({teams.length})</TabsTrigger>
         </TabsList>
 
         {/* JUDGES TAB */}
         <TabsContent value="judges" className="mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {judges.map(judge => {
               const hasActiveSet = !!judge.active_set;
               const elapsed = hasActiveSet ? getElapsedMinutes(judge.active_set!.assigned_at) : 0;
               const timeColor = hasActiveSet ? getTimeColor(elapsed) : '';
 
               return (
-                <Card key={judge.id} className={`transition-all ${
-                  judge.status === 'on_break' ? 'opacity-60' :
-                  hasActiveSet && elapsed > (event?.max_judging_minutes || 20) ? 'border-red-300 bg-red-50/50' :
-                  hasActiveSet ? 'border-green-200 bg-green-50/30' : ''
+                <Card key={judge.id} className={`shadow-sm ${
+                  judge.status === 'on_break' ? 'opacity-70' :
+                  hasActiveSet && elapsed > (event?.max_judging_minutes || 20) ? 'border-amber-200 bg-amber-50/40 ring-1 ring-amber-200' :
+                  hasActiveSet ? 'border-emerald-200 bg-emerald-50/35 ring-1 ring-emerald-200' : 'border-border/60'
                 }`}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-2">
@@ -256,10 +262,19 @@ function DashboardContent() {
                         <h3 className="font-semibold">{judge.name}</h3>
                         <Badge variant="outline" className="text-xs font-mono">{judge.access_code}</Badge>
                       </div>
-                      <Badge variant={
-                        judge.status === 'active' ? 'default' :
-                        judge.status === 'on_break' ? 'secondary' : 'outline'
-                      }>
+                      <Badge
+                        variant={
+                          judge.status === 'active' ? 'default' :
+                          judge.status === 'on_break' ? 'secondary' : 'outline'
+                        }
+                        className={
+                          judge.status === 'active'
+                            ? 'bg-emerald-600 text-white'
+                            : judge.status === 'on_break'
+                              ? 'bg-amber-100 text-amber-800'
+                              : ''
+                        }
+                      >
                         {judge.status === 'active' ? 'Judging' :
                          judge.status === 'on_break' ? 'Break' : 'Idle'}
                       </Badge>
@@ -283,11 +298,11 @@ function DashboardContent() {
                           {judge.active_set!.judging_set_teams
                             ?.sort((a, b) => a.visit_order - b.visit_order)
                             .map(st => (
-                            <div key={st.id} className={`flex items-start gap-2 text-xs rounded-md px-2 py-1.5 ${
-                              st.is_visited ? 'bg-green-50 dark:bg-green-950/20' : 'bg-muted/40'
+                            <div key={st.id} className={`flex items-start gap-2 rounded-md px-2 py-1.5 text-xs ${
+                              st.is_visited ? 'bg-emerald-100/80 text-emerald-950' : 'bg-background/70'
                             }`}>
-                              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5 ${
-                                st.is_visited ? 'bg-green-500 text-white' : 'bg-muted-foreground/20'
+                              <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] ${
+                                st.is_visited ? 'bg-emerald-600 text-white' : 'bg-muted-foreground/20'
                               }`}>
                                 {st.is_visited ? '✓' : st.visit_order}
                               </span>
@@ -313,7 +328,7 @@ function DashboardContent() {
 
         {/* TEAMS TAB */}
         <TabsContent value="teams" className="mt-4">
-          <Card>
+          <Card className="border-border/60 shadow-sm">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

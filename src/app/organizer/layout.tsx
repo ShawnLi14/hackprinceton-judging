@@ -15,8 +15,12 @@ function OrganizerNav() {
 
   useEffect(() => {
     fetch('/api/events')
-      .then(r => r.json())
-      .then(data => setEvents(Array.isArray(data) ? data : []));
+      .then(async (r) => {
+        if (!r.ok) return [];
+        return r.json();
+      })
+      .then(data => setEvents(Array.isArray(data) ? data : []))
+      .catch(() => setEvents([]));
   }, []);
 
   const currentEvent = events.find(e => e.id === eventId);
@@ -32,42 +36,54 @@ function OrganizerNav() {
   ];
 
   return (
-    <nav className="border-b bg-white/80 backdrop-blur sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 flex items-center h-14 gap-4">
-        <Link href="/" className="font-bold text-lg tracking-tight shrink-0">
+    <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
+        <Link
+          href="/"
+          className="font-pixel shrink-0 text-sm font-semibold text-foreground"
+        >
           HackPrinceton
         </Link>
 
-        {/* Event switcher */}
-        {events.length > 1 && (
-          <select
-            className="rounded-md border border-input bg-background px-2 py-1 text-sm max-w-[180px] truncate"
-            value={eventId}
-            onChange={(e) => switchEvent(e.target.value)}
-          >
-            {events.map(evt => (
-              <option key={evt.id} value={evt.id}>{evt.name}</option>
-            ))}
-          </select>
-        )}
-        {events.length === 1 && currentEvent && (
-          <span className="text-sm text-muted-foreground truncate">{currentEvent.name}</span>
-        )}
+        <div className="hidden min-[960px]:block text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Organizer console
+        </div>
 
-        <div className="flex gap-1 ml-auto">
-          {links.map(link => (
-            <Link
-              key={link.path}
-              href={link.href}
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                pathname === link.path
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
+        <div className="ml-auto flex items-center gap-3">
+          {events.length > 1 && (
+            <select
+              aria-label="Switch event"
+              className="h-8 max-w-[200px] rounded-lg border border-input bg-background px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
+              value={eventId}
+              onChange={(e) => switchEvent(e.target.value)}
             >
-              {link.label}
-            </Link>
-          ))}
+              {events.map(evt => (
+                <option key={evt.id} value={evt.id}>{evt.name}</option>
+              ))}
+            </select>
+          )}
+          {events.length === 1 && currentEvent && (
+            <span className="hidden max-w-[220px] truncate text-sm text-muted-foreground sm:inline">
+              {currentEvent.name}
+            </span>
+          )}
+
+          <div className="flex gap-1">
+            {links.map(link => (
+              <Link
+                key={link.path}
+                href={link.href}
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  pathname === link.path
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+                aria-current={pathname === link.path ? 'page' : undefined}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </nav>
@@ -76,11 +92,11 @@ function OrganizerNav() {
 
 export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 text-foreground">
       <Suspense>
         <OrganizerNav />
       </Suspense>
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-6">
         {children}
       </main>
     </div>

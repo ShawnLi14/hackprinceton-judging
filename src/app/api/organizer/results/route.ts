@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
 
   if (!teams) return NextResponse.json([]);
 
-  // Get all completed set teams with ranks
-  const { data: allRankings } = await supabase
+  // The existing `rank` column now stores the submitted 1-5 score.
+  const { data: allScores } = await supabase
     .from('judging_set_teams')
     .select(`
       team_id,
@@ -28,32 +28,20 @@ export async function GET(req: NextRequest) {
     .eq('judging_set.status', 'completed')
     .not('rank', 'is', null);
 
-  // Calculate average normalized rank per team
-  // Normalize: rank / set_size (so 1st of 5 = 0.2, 5th of 5 = 1.0)
-  const teamScores: Record<string, { totalNormalizedRank: number; count: number }> = {};
+  const teamScores: Record<string, { totalScore: number; count: number }> = {};
 
-  // Get event set_size for normalization
-  const { data: event } = await supabase
-    .from('events')
-    .select('set_size')
-    .eq('id', eventId)
-    .single();
-
-  const setSize = event?.set_size || 5;
-
-  for (const r of allRankings || []) {
-    if (r.is_absent || !r.rank) continue;
-    if (!teamScores[r.team_id]) {
-      teamScores[r.team_id] = { totalNormalizedRank: 0, count: 0 };
+  for (const score of allScores || []) {
+    if (score.is_absent || !score.rank) continue;
+    if (!teamScores[score.team_id]) {
+      teamScores[score.team_id] = { totalScore: 0, count: 0 };
     }
-    // Lower rank = better, normalize by set size
-    teamScores[r.team_id].totalNormalizedRank += r.rank / setSize;
-    teamScores[r.team_id].count += 1;
+    teamScores[score.team_id].totalScore += score.rank;
+    teamScores[score.team_id].count += 1;
   }
 
   const results = teams.map(team => {
     const scores = teamScores[team.id];
-    const avgNormalizedRank = scores ? scores.totalNormalizedRank / scores.count : null;
+    const averageScore = scores ? scores.totalScore / scores.count : null;
     return {
       id: team.id,
       name: team.name,
@@ -63,13 +51,12 @@ export async function GET(req: NextRequest) {
       floor: team.room?.floor || 0,
       times_judged: team.times_judged,
       num_rankings: scores?.count || 0,
-      average_normalized_rank: avgNormalizedRank,
-      // Lower is better: invert for a "score" where higher = better
-      score: avgNormalizedRank !== null ? (1 - avgNormalizedRank) * 100 : null,
+      average_normalized_rank: averageScore,
+      score: averageScore,
     };
   });
 
-  // Sort by score descending (best first)
+  // Sort by average score descending (best first)
   results.sort((a, b) => {
     if (a.score === null && b.score === null) return 0;
     if (a.score === null) return 1;

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -8,14 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -282,7 +276,7 @@ function SetupPageContent() {
   };
 
   if (!eventId) {
-    return <p>No event selected. <a href="/" className="underline">Go back</a></p>;
+    return <p>No event selected. <Link href="/" className="underline">Go back</Link></p>;
   }
 
   if (loading) {
@@ -290,40 +284,50 @@ function SetupPageContent() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Event Info */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{event?.name || 'Event'} — Setup</h1>
-          <p className="text-muted-foreground">
-            {teams.length} teams · {judges.length} judges · {rooms.length} rooms
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Badge variant={event?.status === 'active' ? 'default' : 'secondary'}>
-            {event?.status || 'setup'}
-          </Badge>
-          {event?.status === 'setup' && teams.length > 0 && judges.length > 0 && (
-            <Button onClick={startEvent}>Start Judging</Button>
-          )}
-          {event?.status === 'active' && (
-            <Button onClick={() => router.push(`/organizer/dashboard?event=${eventId}`)}>
-              Go to Dashboard
-            </Button>
-          )}
-        </div>
-      </div>
+    <div className="space-y-6">
+      <Card className="border-border/60 bg-background shadow-sm">
+        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Badge variant={event?.status === 'active' ? 'default' : 'secondary'} className="w-fit">
+                {event?.status || 'setup'}
+              </Badge>
+              <h1 className="text-2xl font-semibold text-balance">
+                {event?.name || 'Event'} setup
+              </h1>
+              <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
+                Add rooms, teams, and judges first. When everything is ready, start judging and move to the live dashboard.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+              <span className="rounded-full border border-border/60 bg-muted/40 px-3 py-1">{teams.length} teams</span>
+              <span className="rounded-full border border-border/60 bg-muted/40 px-3 py-1">{judges.length} judges</span>
+              <span className="rounded-full border border-border/60 bg-muted/40 px-3 py-1">{rooms.length} rooms</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {event?.status === 'setup' && teams.length > 0 && judges.length > 0 && (
+              <Button onClick={startEvent}>Start judging</Button>
+            )}
+            {event?.status === 'active' && (
+              <Button onClick={() => router.push(`/organizer/dashboard?event=${eventId}`)}>
+                Open dashboard
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ROOMS */}
-        <Card>
-          <CardHeader>
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="border-b border-border/60 pb-4">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Rooms</CardTitle>
-                <CardDescription>
-                  Physical locations. Closer room numbers = closer proximity.
-                </CardDescription>
+                <CardDescription>Physical locations used to group teams by floor.</CardDescription>
               </div>
               <Button size="sm" variant="outline" onClick={() => setShowBulkRoomImport(!showBulkRoomImport)}>
                 {showBulkRoomImport ? 'Single' : 'Bulk Import'}
@@ -334,13 +338,14 @@ function SetupPageContent() {
             {showBulkRoomImport ? (
               <div className="space-y-2">
                 <Label className="text-xs">One per line: name, room number, floor</Label>
-                <textarea
-                  className="w-full rounded-md border px-3 py-2 text-sm min-h-[120px] font-mono"
+                <Textarea
+                  aria-label="Bulk room import"
+                  className="min-h-[120px] font-mono text-sm"
                   placeholder={`Friend 101, 101, 1\nFriend 201, 201, 2\nSherrerd 301, 301, 3`}
                   value={bulkRooms}
                   onChange={e => setBulkRooms(e.target.value)}
                 />
-                <Button onClick={bulkImportRooms} size="sm" className="w-full">Import Rooms</Button>
+                <Button onClick={bulkImportRooms} size="sm" className="w-full">Import rooms</Button>
               </div>
             ) : (
               <div className="space-y-2">
@@ -348,6 +353,7 @@ function SetupPageContent() {
                   <div>
                     <Label className="text-xs">Name</Label>
                     <Input
+                      aria-label="Room name"
                       placeholder="Room A"
                       value={newRoom.name}
                       onChange={e => setNewRoom(p => ({ ...p, name: e.target.value }))}
@@ -357,6 +363,7 @@ function SetupPageContent() {
                   <div>
                     <Label className="text-xs">Number</Label>
                     <Input
+                      aria-label="Room number"
                       type="number"
                       placeholder="101"
                       value={newRoom.room_number}
@@ -367,6 +374,7 @@ function SetupPageContent() {
                   <div>
                     <Label className="text-xs">Floor</Label>
                     <Input
+                      aria-label="Room floor"
                       type="number"
                       placeholder="1"
                       value={newRoom.floor}
@@ -375,7 +383,7 @@ function SetupPageContent() {
                     />
                   </div>
                 </div>
-                <Button onClick={addRoom} size="sm" className="w-full">Add Room</Button>
+                <Button onClick={addRoom} size="sm" className="w-full">Add room</Button>
               </div>
             )}
 
@@ -383,26 +391,26 @@ function SetupPageContent() {
 
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {rooms.map(room => (
-                <div key={room.id} className="flex items-center justify-between text-sm">
+                <div key={room.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm">
                   <div>
                     <span className="font-medium">{room.name}</span>
                     <span className="text-muted-foreground ml-2">#{room.room_number} · F{room.floor}</span>
                   </div>
-                  <Button size="sm" variant="ghost" className="text-destructive h-7" onClick={() => deleteRoom(room.id)}>×</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-destructive" aria-label={`Delete room ${room.name}`} onClick={() => deleteRoom(room.id)}>×</Button>
                 </div>
               ))}
-              {rooms.length === 0 && <p className="text-sm text-muted-foreground">No rooms yet</p>}
+              {rooms.length === 0 && <p className="text-sm text-muted-foreground">No rooms yet.</p>}
             </div>
           </CardContent>
         </Card>
 
         {/* TEAMS */}
-        <Card>
-          <CardHeader>
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="border-b border-border/60 pb-4">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Teams ({teams.length})</CardTitle>
-                <CardDescription>Hackathon teams/projects</CardDescription>
+                <CardDescription>Team names, project names, and room placement.</CardDescription>
               </div>
               <Button size="sm" variant="outline" onClick={() => setShowBulkImport(!showBulkImport)}>
                 {showBulkImport ? 'Single' : 'Bulk Import'}
@@ -413,23 +421,26 @@ function SetupPageContent() {
             {showBulkImport ? (
               <div className="space-y-2">
                 <Label className="text-xs">CSV: name, project, team #, room name (one per line)</Label>
-                <textarea
-                  className="w-full rounded-md border px-3 py-2 text-sm min-h-[120px] font-mono"
+                <Textarea
+                  aria-label="Bulk team import"
+                  className="min-h-[120px] font-mono text-sm"
                   placeholder={`Team Alpha, AI Project, 1, ${rooms[0]?.name || 'Room A'}\nTeam Beta, Web App, 2, ${rooms[0]?.name || 'Room A'}`}
                   value={bulkTeams}
                   onChange={e => setBulkTeams(e.target.value)}
                 />
-                <Button onClick={bulkImportTeams} size="sm" className="w-full">Import Teams</Button>
+                <Button onClick={bulkImportTeams} size="sm" className="w-full">Import teams</Button>
               </div>
             ) : (
               <div className="space-y-2">
                 <Input
+                  aria-label="Team name"
                   placeholder="Team Name"
                   value={newTeam.name}
                   onChange={e => setNewTeam(p => ({ ...p, name: e.target.value }))}
                   className="text-sm"
                 />
                 <Input
+                  aria-label="Project name"
                   placeholder="Project Name (optional)"
                   value={newTeam.project_name}
                   onChange={e => setNewTeam(p => ({ ...p, project_name: e.target.value }))}
@@ -437,13 +448,14 @@ function SetupPageContent() {
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <Input
+                    aria-label="Team number"
                     placeholder="Team #"
                     value={newTeam.team_number}
                     onChange={e => setNewTeam(p => ({ ...p, team_number: e.target.value }))}
                     className="text-sm"
                   />
                   <Select value={newTeam.room_name} onValueChange={(v) => setNewTeam(p => ({ ...p, room_name: v ?? '' }))}>
-                    <SelectTrigger className="text-sm">
+                    <SelectTrigger aria-label="Team room" className="text-sm">
                       <SelectValue placeholder="Room" />
                     </SelectTrigger>
                     <SelectContent>
@@ -453,7 +465,7 @@ function SetupPageContent() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={addTeam} size="sm" className="w-full">Add Team</Button>
+                <Button onClick={addTeam} size="sm" className="w-full">Add team</Button>
               </div>
             )}
 
@@ -461,28 +473,28 @@ function SetupPageContent() {
 
             <div className="space-y-1 max-h-64 overflow-y-auto">
               {teams.map(team => (
-                <div key={team.id} className="flex items-center justify-between text-sm">
+                <div key={team.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm">
                   <div className="min-w-0 flex-1">
                     <span className="font-medium truncate block">{team.name}</span>
                     <span className="text-xs text-muted-foreground">
                       {team.room?.name || '?'} · #{team.team_number}
                     </span>
                   </div>
-                  <Button size="sm" variant="ghost" className="text-destructive h-7" onClick={() => deleteTeam(team.id)}>×</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-destructive" aria-label={`Delete team ${team.name}`} onClick={() => deleteTeam(team.id)}>×</Button>
                 </div>
               ))}
-              {teams.length === 0 && <p className="text-sm text-muted-foreground">No teams yet</p>}
+              {teams.length === 0 && <p className="text-sm text-muted-foreground">No teams yet.</p>}
             </div>
           </CardContent>
         </Card>
 
         {/* JUDGES */}
-        <Card>
-          <CardHeader>
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="border-b border-border/60 pb-4">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Judges ({judges.length})</CardTitle>
-                <CardDescription>Each judge gets a unique access code</CardDescription>
+                <CardDescription>Each judge gets a unique access code and login path.</CardDescription>
               </div>
               <Button size="sm" variant="outline" onClick={() => setShowBulkJudgeImport(!showBulkJudgeImport)}>
                 {showBulkJudgeImport ? 'Single' : 'Bulk Import'}
@@ -493,29 +505,32 @@ function SetupPageContent() {
             {showBulkJudgeImport ? (
               <div className="space-y-2">
                 <Label className="text-xs">One per line: name, access_code (code is optional)</Label>
-                <textarea
-                  className="w-full rounded-md border px-3 py-2 text-sm min-h-[120px] font-mono"
+                <Textarea
+                  aria-label="Bulk judge import"
+                  className="min-h-[120px] font-mono text-sm"
                   placeholder={`Alice Johnson, ALICE1\nBob Smith, BOB42\nCharlie Brown`}
                   value={bulkJudges}
                   onChange={e => setBulkJudges(e.target.value)}
                 />
-                <Button onClick={bulkImportJudges} size="sm" className="w-full">Import Judges</Button>
+                <Button onClick={bulkImportJudges} size="sm" className="w-full">Import judges</Button>
               </div>
             ) : (
               <div className="space-y-2">
                 <Input
+                  aria-label="Judge name"
                   placeholder="Judge Name"
                   value={newJudge.name}
                   onChange={e => setNewJudge(p => ({ ...p, name: e.target.value }))}
                   className="text-sm"
                 />
                 <Input
+                  aria-label="Access code"
                   placeholder="Access Code (auto-generated if empty)"
                   value={newJudge.access_code}
                   onChange={e => setNewJudge(p => ({ ...p, access_code: e.target.value.toUpperCase() }))}
                   className="text-sm font-mono"
                 />
-                <Button onClick={addJudge} size="sm" className="w-full">Add Judge</Button>
+                <Button onClick={addJudge} size="sm" className="w-full">Add judge</Button>
               </div>
             )}
 
@@ -523,23 +538,23 @@ function SetupPageContent() {
 
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {judges.map(j => (
-                <div key={j.id} className="flex items-center justify-between text-sm">
+                <div key={j.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm">
                   <div>
                     <span className="font-medium">{j.name}</span>
                     <Badge variant="outline" className="ml-2 font-mono text-xs">{j.access_code}</Badge>
                   </div>
-                  <Button size="sm" variant="ghost" className="text-destructive h-7" onClick={() => deleteJudge(j.id)}>×</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-destructive" aria-label={`Delete judge ${j.name}`} onClick={() => deleteJudge(j.id)}>×</Button>
                 </div>
               ))}
-              {judges.length === 0 && <p className="text-sm text-muted-foreground">No judges yet</p>}
+              {judges.length === 0 && <p className="text-sm text-muted-foreground">No judges yet.</p>}
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Event Configuration */}
-      <Card>
-        <CardHeader>
+      <Card className="border-border/60 shadow-sm">
+        <CardHeader className="border-b border-border/60 pb-4">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Event Configuration</CardTitle>
@@ -552,13 +567,14 @@ function SetupPageContent() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           {editingConfig ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs">Event Name</Label>
                   <Input
+                    aria-label="Event name"
                     value={configForm.name}
                     onChange={e => setConfigForm(p => ({ ...p, name: e.target.value }))}
                     className="text-sm"
@@ -567,6 +583,7 @@ function SetupPageContent() {
                 <div className="space-y-1">
                   <Label className="text-xs">Teams per Set</Label>
                   <Input
+                    aria-label="Teams per set"
                     type="number"
                     min={1}
                     max={20}
@@ -578,6 +595,7 @@ function SetupPageContent() {
                 <div className="space-y-1">
                   <Label className="text-xs">Target Judgings per Team</Label>
                   <Input
+                    aria-label="Target judgings per team"
                     type="number"
                     min={1}
                     max={20}
@@ -589,6 +607,7 @@ function SetupPageContent() {
                 <div className="space-y-1">
                   <Label className="text-xs">Max Minutes per Set</Label>
                   <Input
+                    aria-label="Max judging minutes per set"
                     type="number"
                     min={1}
                     max={120}
