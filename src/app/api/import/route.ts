@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { assignGeneratedJudgeCodes } from '@/lib/judge-codes';
 import { supabase } from '@/lib/supabase';
 
 // POST: bulk import rooms, teams (by room name), and judges from text data
@@ -97,14 +98,26 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === 'judges') {
-      const judges = lines.map((line: string) => {
+      const parsedJudges = lines.map((line: string) => {
         const parts = line.split(',').map((s: string) => s.trim());
         return {
           event_id,
           name: parts[0],
-          access_code: (parts[1] || `JUDGE-${Math.floor(Math.random() * 900) + 100}`).toUpperCase(),
+          access_code: parts[1] || undefined,
         };
       });
+
+      const { data: existingJudges, error: existingError } = await supabase
+        .from('judges')
+        .select('access_code')
+        .eq('event_id', event_id);
+
+      if (existingError) return NextResponse.json({ error: existingError.message }, { status: 400 });
+
+      const judges = assignGeneratedJudgeCodes(
+        parsedJudges,
+        (existingJudges || []).map(judge => judge.access_code)
+      );
 
       const { data: created, error } = await supabase.from('judges').insert(judges).select();
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });

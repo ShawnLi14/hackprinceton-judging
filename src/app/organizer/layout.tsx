@@ -36,24 +36,23 @@ function OrganizerNav() {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4">
-        <Link
-          href="/"
-          className="font-pixel shrink-0 text-sm font-semibold text-foreground"
-        >
-          HackPrinceton
-        </Link>
+    <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <Link href="/" className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+              Judging
+            </Link>
+            <p className="text-base font-semibold tracking-[-0.02em] text-balance">
+              {currentEvent?.name || 'Organizer'}
+            </p>
+          </div>
 
-        <div className="hidden min-[960px]:block text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Organizer console
-        </div>
-
-        <div className="ml-auto flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           {events.length > 1 && (
             <select
               aria-label="Switch event"
-              className="h-8 max-w-[200px] rounded-lg border border-input bg-background px-2.5 text-sm text-foreground outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="h-10 min-w-[220px] rounded-lg border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
               value={eventId}
               onChange={(e) => switchEvent(e.target.value)}
             >
@@ -63,27 +62,28 @@ function OrganizerNav() {
             </select>
           )}
           {events.length === 1 && currentEvent && (
-            <span className="hidden max-w-[220px] truncate text-sm text-muted-foreground sm:inline">
+            <span className="hidden max-w-[240px] truncate text-sm text-muted-foreground sm:inline">
               {currentEvent.name}
             </span>
           )}
+          </div>
+        </div>
 
-          <div className="flex gap-1">
+        <div className="flex flex-wrap gap-2.5 text-sm">
             {links.map(link => (
               <Link
                 key={link.path}
                 href={link.href}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-lg px-3 py-2 font-medium transition-colors ${
                   pathname === link.path
                     ? 'bg-foreground text-background'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                 }`}
                 aria-current={pathname === link.path ? 'page' : undefined}
               >
                 {link.label}
               </Link>
             ))}
-          </div>
         </div>
       </div>
     </nav>
@@ -92,11 +92,11 @@ function OrganizerNav() {
 
 export default function OrganizerLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-50 text-foreground">
+    <div className="editorial-shell">
       <Suspense>
         <OrganizerNav />
       </Suspense>
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
         {children}
       </main>
     </div>

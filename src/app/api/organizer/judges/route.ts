@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { assignGeneratedJudgeCodes } from '@/lib/judge-codes';
 import { supabase } from '@/lib/supabase';
 
 // GET: list judges for an event with their active sets
@@ -45,16 +46,32 @@ export async function GET(req: NextRequest) {
 // POST: create a judge
 export async function POST(req: NextRequest) {
   const body = await req.json();
-
   const judges = Array.isArray(body) ? body : [body];
+  const eventId = judges[0]?.event_id;
+
+  if (!eventId) return NextResponse.json({ error: 'Missing event_id' }, { status: 400 });
+
+  const { data: existingJudges, error: existingError } = await supabase
+    .from('judges')
+    .select('access_code')
+    .eq('event_id', eventId);
+
+  if (existingError) {
+    return NextResponse.json({ error: existingError.message }, { status: 400 });
+  }
+
+  const judgesWithCodes = assignGeneratedJudgeCodes(
+    judges.map(judge => ({
+      event_id: judge.event_id,
+      name: judge.name,
+      access_code: judge.access_code,
+    })),
+    (existingJudges || []).map(judge => judge.access_code)
+  );
 
   const { data, error } = await supabase
     .from('judges')
-    .insert(judges.map(j => ({
-      event_id: j.event_id,
-      name: j.name,
-      access_code: j.access_code?.toUpperCase() || `JUDGE-${Math.floor(Math.random() * 900) + 100}`,
-    })))
+    .insert(judgesWithCodes)
     .select();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

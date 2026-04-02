@@ -2,29 +2,21 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import {
-  CheckCircle2,
-  ClipboardList,
-  Coffee,
-  KeyRound,
-  MapPinned,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { CheckCircle2, MapPinned } from 'lucide-react';
+import BlockWordmark from '@/components/BlockWordmark';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Judge, JudgingSetWithTeams, JudgingSetTeam, Team, Room } from '@/lib/types';
+import type { Judge, JudgingSetTeam, JudgingSetWithTeams, Room, Team } from '@/lib/types';
 
 type SetTeamWithDetails = JudgingSetTeam & { team: Team & { room: Room } };
-type TeamEvaluation = { score: string; notes: string; is_absent: boolean };
+type TeamEvaluation = { score: string; is_absent: boolean };
 
 function buildInitialEvaluations(set: JudgingSetWithTeams) {
   return set.judging_set_teams.reduce<Record<string, TeamEvaluation>>((acc, setTeam) => {
     acc[setTeam.team_id] = {
       score: setTeam.rank ? String(setTeam.rank) : '',
-      notes: setTeam.notes || '',
       is_absent: setTeam.is_absent || false,
     };
     return acc;
@@ -141,7 +133,6 @@ function JudgePageContent() {
           ...current,
           is_absent: nextAbsent,
           score: nextAbsent ? '' : current?.score || '',
-          notes: current?.notes || '',
         },
       };
     });
@@ -157,7 +148,6 @@ function JudgePageContent() {
       [teamId]: {
         ...prev[teamId],
         score: nextScore,
-        notes: prev[teamId]?.notes || '',
         is_absent: prev[teamId]?.is_absent || false,
       },
     }));
@@ -171,7 +161,6 @@ function JudgePageContent() {
     const submittedEvaluations = activeSet.judging_set_teams.map(setTeam => ({
       team_id: setTeam.team_id,
       score: evaluations[setTeam.team_id]?.is_absent ? null : Number(evaluations[setTeam.team_id]?.score || ''),
-      notes: evaluations[setTeam.team_id]?.notes || '',
       is_absent: evaluations[setTeam.team_id]?.is_absent || false,
     }));
 
@@ -248,355 +237,288 @@ function JudgePageContent() {
   const missingScores = presentTeams.length - scoredTeams;
   const canSubmitScores = missingScores === 0;
   const floor = setTeams[0]?.team?.room?.floor;
+  const statusTone =
+    phase === 'scoring'
+      ? {
+          badge: 'bg-sky-100 text-sky-900',
+          label: 'Scoring',
+          step: 'Step 2: score teams',
+        }
+      : {
+          badge: 'bg-emerald-100 text-emerald-900',
+          label: 'Visiting',
+          step: 'Step 1: visit teams',
+        };
 
   if (!eventId) {
     return (
-      <div className="app-shell flex min-h-dvh items-center justify-center px-4 py-10">
-        <Card className="w-full max-w-md border-border/60 shadow-sm">
-          <CardHeader>
-            <CardTitle>No event selected</CardTitle>
-            <CardDescription>Please go back and choose an event first.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => window.location.assign('/')} className="w-full">
-              Go back
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <CenteredJudgeState
+        kicker="Judging"
+        title="Choose an event"
+        description="Open the judge flow from the event list on the homepage."
+      >
+        <Button onClick={() => window.location.assign('/')} className="h-10 w-full rounded-lg">
+          Go back
+        </Button>
+      </CenteredJudgeState>
     );
   }
 
   if (phase === 'login') {
     return (
-      <div className="app-shell flex min-h-dvh items-center justify-center px-4 py-10">
-        <Card className="w-full max-w-md border-border/60 shadow-sm">
-          <CardHeader className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-foreground">
-                <KeyRound className="size-5" aria-hidden="true" />
-              </div>
-              <div className="space-y-1">
-                <p className="font-pixel text-xs text-muted-foreground">HackPrinceton Judging</p>
-                <CardTitle className="text-2xl text-balance">Judge check-in</CardTitle>
-              </div>
-            </div>
-            <CardDescription className="text-pretty">
-              Enter your access code, visit each assigned team, then submit a score from 1 to 5 for every present team.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="judge-access-code">Access code</Label>
-              <Input
-                id="judge-access-code"
-                placeholder="e.g. JUDGE-001"
-                value={accessCode}
-                onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
-                onKeyDown={(e) => e.key === 'Enter' && login()}
-                className="h-11 text-center font-mono text-base tabular-nums"
-                autoFocus
-                autoCapitalize="characters"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-            </div>
+      <CenteredJudgeState
+        kicker="Judge sign in"
+        title="Enter your access code"
+        description="Use the code your organizer gave you."
+      >
+        <div className="space-y-2 text-left">
+          <Label htmlFor="judge-access-code">Access code</Label>
+          <Input
+            id="judge-access-code"
+            placeholder="JUDGE-001"
+            value={accessCode}
+            onChange={e => setAccessCode(e.target.value.toUpperCase())}
+            onKeyDown={e => e.key === 'Enter' && login()}
+            className="h-10 rounded-lg font-mono text-sm tabular-nums"
+            autoFocus
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+        </div>
 
-            <div className="rounded-xl border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2 text-foreground">
-                <ClipboardList className="size-4" aria-hidden="true" />
-                <span className="font-medium">How judging works</span>
-              </div>
-              <p className="mt-2 text-pretty">
-                Step 1: mark each visit complete. Step 2: enter a whole-number score out of 5. Add notes only when they help organizers.
-              </p>
-            </div>
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
 
-            {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-
-            <Button onClick={login} disabled={loading || !accessCode.trim()} className="h-11 w-full">
-              {loading ? 'Logging in...' : 'Start judging'}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+        <Button
+          onClick={login}
+          disabled={loading || !accessCode.trim()}
+          className="h-10 w-full rounded-lg"
+        >
+          {loading ? 'Logging in...' : 'Start judging'}
+        </Button>
+      </CenteredJudgeState>
     );
   }
 
   if (phase === 'waiting') {
     return (
-      <div className="app-shell flex min-h-dvh items-center justify-center px-4 py-10">
-        <Card className="w-full max-w-md border-border/60 shadow-sm">
-          <CardHeader className="space-y-3">
-            <p className="font-pixel text-xs text-muted-foreground">Ready for the next set</p>
-            <div className="space-y-1">
-              <CardTitle className="text-3xl text-balance">{judge?.name}</CardTitle>
-              <CardDescription className="text-pretty">
-                You&apos;ve completed <span className="font-medium text-foreground tabular-nums">{judge?.sets_completed || 0}</span> sets so far.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-            <Button onClick={requestSet} disabled={loading} className="h-11 w-full">
-              {loading ? 'Finding teams...' : 'Get next set of teams'}
-            </Button>
-            <Button onClick={goOnBreak} variant="outline" className="h-11 w-full">
-              Take a break
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <CenteredJudgeState
+        kicker="Ready"
+        title={judge?.name || 'Judge'}
+        description={`${judge?.sets_completed || 0} set${judge?.sets_completed === 1 ? '' : 's'} completed.`}
+      >
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-2">
+          <Button onClick={requestSet} disabled={loading} className="h-10 w-full rounded-lg">
+            {loading ? 'Finding teams...' : 'Get next set'}
+          </Button>
+          <Button onClick={goOnBreak} variant="outline" className="h-10 w-full rounded-lg">
+            Take a break
+          </Button>
+        </div>
+      </CenteredJudgeState>
     );
   }
 
   if (phase === 'on_break') {
     return (
-      <div className="app-shell flex min-h-dvh items-center justify-center px-4 py-10">
-        <Card className="w-full max-w-md border-border/60 shadow-sm">
-          <CardHeader className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-foreground">
-                <Coffee className="size-5" aria-hidden="true" />
-              </div>
-              <div className="space-y-1">
-                <p className="font-pixel text-xs text-muted-foreground">Break mode</p>
-                <CardTitle className="text-2xl">Paused</CardTitle>
-              </div>
-            </div>
-            <CardDescription className="text-pretty">
-              Take your time, {judge?.name}. Resume when you&apos;re ready for another set.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground tabular-nums">
-              {judge?.sets_completed || 0} sets completed
-            </p>
-            <Button onClick={comeBackFromBreak} className="h-11 w-full">
-              Resume judging
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <CenteredJudgeState
+        kicker="On break"
+        title={judge?.name || 'Judge'}
+        description="Resume whenever you are ready for another set."
+      >
+        <p className="text-sm text-muted-foreground tabular-nums">
+          {judge?.sets_completed || 0} set{judge?.sets_completed === 1 ? '' : 's'} completed
+        </p>
+        <Button onClick={comeBackFromBreak} className="h-10 w-full rounded-lg">
+          Resume judging
+        </Button>
+      </CenteredJudgeState>
     );
   }
 
   return (
-    <div className="app-shell min-h-dvh px-4 py-6 pb-32">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
-        <Card className={`shadow-sm ${phase === 'scoring' ? 'border-sky-200 bg-sky-50/35' : 'border-emerald-200 bg-emerald-50/35'}`}>
-          <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <p className="font-pixel text-xs text-muted-foreground">
-                {phase === 'scoring' ? 'Step 2: score teams' : 'Step 1: visit teams'}
-              </p>
-              <div className="space-y-1">
-                <h1 className="text-2xl font-semibold text-balance">{judge?.name}</h1>
-                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <MapPinned className="size-4" aria-hidden="true" />
-                    Floor {floor}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
+    <div className="editorial-shell px-4 py-6 pb-28">
+      <main className="mx-auto grid w-full max-w-5xl gap-8 lg:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="space-y-8">
+          <header className="space-y-3">
+            <p className="editorial-kicker">Judging</p>
+
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">{statusTone.step}</p>
+                <h1 className="text-base font-semibold tracking-[-0.02em] text-balance">{judge?.name}</h1>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  {floor !== undefined && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPinned className="size-4" aria-hidden="true" />
+                      Floor {floor}
+                    </span>
+                  )}
+                  <span className="tabular-nums">
                     <ElapsedTimer startTime={activeSet?.assigned_at || ''} />
                   </span>
                 </div>
               </div>
-              <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-                Keep the flow simple: finish the walk, then give each present team a whole-number score from 1 to 5.
-              </p>
+
+              <Badge className={statusTone.badge}>{statusTone.label}</Badge>
             </div>
 
-            <Badge
-              variant={phase === 'scoring' ? 'default' : 'secondary'}
-              className={phase === 'scoring' ? 'w-fit self-start bg-sky-600 text-white' : 'w-fit self-start bg-emerald-100 text-emerald-800'}
-            >
-              {phase === 'scoring' ? 'Scoring' : 'Visiting'}
-            </Badge>
-          </CardContent>
-        </Card>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground text-pretty">
+              Finish the walk first, then give each present team a whole-number score from 1 to 5.
+            </p>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="space-y-3">
             {error && (
-              <Card className="border-destructive/30 bg-destructive/5 shadow-none">
-                <CardContent className="p-4">
-                  <p className="text-sm text-destructive" role="alert">{error}</p>
-                </CardContent>
-              </Card>
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
             )}
+          </header>
 
+          <section className="space-y-7">
             {setTeams.map(setTeam => {
               const evaluation = evaluations[setTeam.team_id];
               const isAbsent = evaluation?.is_absent;
               const isVisited = setTeam.is_visited;
 
               return (
-                <Card
-                  key={setTeam.id}
-                  className={`shadow-sm ${
-                    isAbsent
-                      ? 'border-border/60 bg-muted/20'
-                      : isVisited
-                        ? 'border-emerald-200 bg-emerald-50/40'
-                        : phase === 'scoring'
-                          ? 'border-sky-200 bg-sky-50/30'
-                          : 'border-border/60 bg-card'
-                  }`}
-                >
-                  <CardContent className="space-y-4 p-5">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-muted text-sm font-medium tabular-nums">
-                            {setTeam.visit_order}
-                          </span>
-                          <h2 className="truncate text-lg font-medium">{setTeam.team?.name}</h2>
-                          {isVisited && !isAbsent && <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">Visited</Badge>}
-                          {isAbsent && <Badge variant="outline">Absent</Badge>}
-                        </div>
-
-                        {setTeam.team?.project_name && (
-                          <p className="text-sm text-pretty text-muted-foreground">{setTeam.team.project_name}</p>
+                <article key={setTeam.id} className="space-y-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-muted/70 px-2 text-sm font-medium tabular-nums">
+                          {setTeam.visit_order}
+                        </span>
+                        <h2 className="min-w-0 text-base font-medium tracking-[-0.01em]">{setTeam.team?.name}</h2>
+                        {isVisited && !isAbsent && (
+                          <Badge className="bg-emerald-100 text-emerald-900">Visited</Badge>
                         )}
-
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <Badge variant="outline">Room {setTeam.team?.room?.name}</Badge>
-                          <Badge variant="outline">Table #{setTeam.team?.team_number}</Badge>
-                        </div>
+                        {isAbsent && <Badge variant="outline">Absent</Badge>}
                       </div>
 
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        {phase === 'judging' && !isAbsent && (
-                          <Button
-                            size="sm"
-                            variant={isVisited ? 'secondary' : 'default'}
-                            onClick={() => markVisited(setTeam.team_id)}
-                            disabled={isVisited}
-                          >
-                            {isVisited ? 'Visited' : 'Mark visited'}
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => toggleAbsent(setTeam.team_id)}
-                          aria-pressed={isAbsent}
-                        >
-                          {isAbsent ? 'Mark present' : 'Mark absent'}
-                        </Button>
+                      {setTeam.team?.project_name && (
+                        <p className="text-sm leading-6 text-muted-foreground text-pretty">
+                          {setTeam.team.project_name}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline">Room {setTeam.team?.room?.name}</Badge>
+                        <Badge variant="outline">Team #{setTeam.team?.team_number}</Badge>
                       </div>
                     </div>
 
-                    {phase === 'scoring' && !isAbsent && (
-                      <div className="grid gap-4 sm:grid-cols-[130px_minmax(0,1fr)]">
-                        <div className="space-y-2">
-                          <Label htmlFor={`score-${setTeam.team_id}`}>Score / 5</Label>
-                          <Input
-                            id={`score-${setTeam.team_id}`}
-                            type="number"
-                            min={1}
-                            max={5}
-                            inputMode="numeric"
-                            value={evaluation?.score || ''}
-                            onChange={(e) => updateScore(setTeam.team_id, e.target.value)}
-                            className="h-11 text-center text-lg tabular-nums"
-                            aria-describedby={`score-help-${setTeam.team_id}`}
-                          />
-                          <p id={`score-help-${setTeam.team_id}`} className="text-xs text-muted-foreground">
-                            Whole numbers only.
-                          </p>
-                        </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      {phase === 'judging' && !isAbsent && (
+                        <Button
+                          size="sm"
+                          variant={isVisited ? 'secondary' : 'default'}
+                          onClick={() => markVisited(setTeam.team_id)}
+                          disabled={isVisited}
+                          className="min-w-28 rounded-lg"
+                        >
+                          {isVisited ? 'Visited' : 'Mark visited'}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => toggleAbsent(setTeam.team_id)}
+                        aria-pressed={isAbsent}
+                        className="min-w-28 rounded-lg"
+                      >
+                        {isAbsent ? 'Mark present' : 'Mark absent'}
+                      </Button>
+                    </div>
+                  </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor={`notes-${setTeam.team_id}`}>Notes</Label>
-                          <Textarea
-                            id={`notes-${setTeam.team_id}`}
-                            placeholder="Optional notes for organizers"
-                            className="min-h-24 text-sm"
-                            rows={3}
-                            value={evaluation?.notes || ''}
-                            onChange={(e) =>
-                              setEvaluations(prev => ({
-                                ...prev,
-                                [setTeam.team_id]: {
-                                  ...prev[setTeam.team_id],
-                                  notes: e.target.value,
-                                  score: prev[setTeam.team_id]?.score || '',
-                                  is_absent: prev[setTeam.team_id]?.is_absent || false,
-                                },
-                              }))
-                            }
-                          />
-                        </div>
+                  {phase === 'scoring' && !isAbsent && (
+                    <div className="max-w-[108px] space-y-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`score-${setTeam.team_id}`}>Score / 5</Label>
+                        <Input
+                          id={`score-${setTeam.team_id}`}
+                          type="number"
+                          min={1}
+                          max={5}
+                          inputMode="numeric"
+                          value={evaluation?.score || ''}
+                          onChange={e => updateScore(setTeam.team_id, e.target.value)}
+                          className="h-10 text-center text-sm tabular-nums"
+                          aria-describedby={`score-help-${setTeam.team_id}`}
+                        />
+                        <p id={`score-help-${setTeam.team_id}`} className="text-xs text-muted-foreground">
+                          Whole numbers only
+                        </p>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                    </div>
+                  )}
+                </article>
               );
             })}
+          </section>
+        </div>
+
+        <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="size-4 text-muted-foreground" aria-hidden="true" />
+              <p className="text-sm font-medium">Checklist</p>
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground text-pretty">
+              {phase === 'judging'
+                ? 'Mark each team as visited or absent before moving to scoring.'
+                : 'Every present team needs a score before this set can be submitted.'}
+            </p>
           </div>
 
-          <Card className={`shadow-sm lg:sticky lg:top-20 lg:self-start ${phase === 'scoring' ? 'border-sky-200 bg-sky-50/35' : 'border-emerald-200 bg-emerald-50/35'}`}>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="size-4 text-muted-foreground" aria-hidden="true" />
-                <CardTitle>Checklist</CardTitle>
-              </div>
-              <CardDescription>
-                {phase === 'judging'
-                  ? 'Finish every visit first.'
-                  : 'Every present team needs a score before submission.'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <SummaryRow label="Teams in set" value={`${setTeams.length}`} />
-              <SummaryRow label="Visited or absent" value={`${visitedOrAbsentCount}/${setTeams.length}`} />
-              <SummaryRow label="Scores entered" value={`${scoredTeams}/${presentTeams.length}`} />
-              <div className={`rounded-xl p-3 ${
-                phase === 'judging'
-                  ? 'bg-emerald-100/70 text-emerald-950'
-                  : missingScores > 0
-                    ? 'bg-sky-100/70 text-sky-950'
-                    : 'bg-sky-600 text-white'
-              }`}>
-                {phase === 'judging'
-                  ? 'Mark visits as you go. If a team is unavailable, mark them absent and continue.'
-                  : missingScores > 0
-                    ? `${missingScores} present team${missingScores === 1 ? '' : 's'} still need a score.`
-                    : 'All scores are in. You can submit this set now.'}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+          <div className="space-y-2">
+            <SummaryRow label="Teams in set" value={`${setTeams.length}`} />
+            <SummaryRow label="Visited or absent" value={`${visitedOrAbsentCount}/${setTeams.length}`} />
+            <SummaryRow label="Scores entered" value={`${scoredTeams}/${presentTeams.length}`} />
+          </div>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-border/60 bg-background/95 px-4 py-4 backdrop-blur">
+          <p className="text-sm leading-6 text-muted-foreground text-pretty">
+            {phase === 'judging'
+              ? 'If a team is unavailable, mark them absent and continue.'
+              : missingScores > 0
+                ? `${missingScores} present team${missingScores === 1 ? '' : 's'} still need a score.`
+                : 'All scores are in. Submit whenever you are ready.'}
+          </p>
+        </aside>
+      </main>
+
+      <div className="fixed inset-x-0 bottom-0 border-t border-border/60 bg-background/96 px-4 py-4 backdrop-blur">
         <div
-          className="mx-auto flex w-full max-w-4xl flex-col gap-2 sm:flex-row"
+          className="mx-auto flex w-full max-w-5xl flex-col gap-2 sm:flex-row"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0px)' }}
         >
           {phase === 'judging' ? (
             <Button
               onClick={() => setPhase('scoring')}
-              className="h-11 w-full sm:flex-1"
+              className="h-10 w-full rounded-lg sm:flex-1"
               disabled={!allVisited}
             >
               {allVisited ? 'Continue to scoring' : `Visit all teams first (${visitedOrAbsentCount}/${setTeams.length})`}
             </Button>
           ) : (
             <>
-              <Button
-                onClick={() => setPhase('judging')}
-                variant="outline"
-                className="h-11 w-full sm:flex-1"
-              >
+              <Button onClick={() => setPhase('judging')} variant="outline" className="h-10 w-full rounded-lg sm:flex-1">
                 Back to visits
               </Button>
               <Button
                 onClick={submitScores}
                 disabled={loading || !canSubmitScores}
-                className="h-11 w-full sm:flex-1"
+                className="h-10 w-full rounded-lg sm:flex-1"
               >
                 {loading ? 'Submitting...' : 'Submit scores'}
               </Button>
@@ -608,9 +530,39 @@ function JudgePageContent() {
   );
 }
 
+function CenteredJudgeState({
+  kicker,
+  title,
+  description,
+  children,
+}: {
+  kicker: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="editorial-shell px-4 py-10">
+      <main className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-3xl flex-col items-center justify-center gap-8">
+        <BlockWordmark text="JUDGING" className="max-w-[360px]" />
+
+        <section className="w-full max-w-sm space-y-5 text-center">
+          <div className="space-y-2">
+            <p className="editorial-kicker">{kicker}</p>
+            <h1 className="text-base font-semibold tracking-[-0.02em] text-balance">{title}</h1>
+            <p className="text-sm leading-6 text-muted-foreground text-pretty">{description}</p>
+          </div>
+
+          <div className="space-y-3">{children}</div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-center justify-between gap-3 text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium tabular-nums">{value}</span>
     </div>
@@ -642,9 +594,7 @@ export default function JudgePage() {
     <Suspense
       fallback={
         <div className="app-shell flex min-h-dvh items-center justify-center px-4 py-10">
-          <div className="rounded-full border border-border/60 bg-background px-4 py-2 text-sm text-muted-foreground">
-            Loading judge view...
-          </div>
+          <p className="text-sm text-muted-foreground">Loading judge view...</p>
         </div>
       }
     >

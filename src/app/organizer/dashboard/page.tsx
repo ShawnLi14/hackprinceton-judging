@@ -1,14 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabase';
 import type { Event, Judge, Team, Room, JudgingSetWithTeams } from '@/lib/types';
 
@@ -17,9 +13,29 @@ interface JudgeWithSet extends Judge {
   current_room?: Room;
 }
 
+function DashboardMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-medium ${tone}`} aria-hidden="true">
+        {label}
+      </span>
+      <p className="text-base font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
 function DashboardContent() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get('event');
+  const dashboardEventId = eventId;
 
   const [event, setEvent] = useState<Event | null>(null);
   const [judges, setJudges] = useState<JudgeWithSet[]>([]);
@@ -27,25 +43,29 @@ function DashboardContent() {
   const [locks, setLocks] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
+  const [view, setView] = useState<'judges' | 'teams'>('judges');
 
-  // Debounce ref: prevents hundreds of simultaneous reloads from realtime events
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef(false);
 
   const loadData = useCallback(async () => {
-    if (!eventId) return;
-    // Skip if already loading (prevent overlapping fetches)
-    if (loadingRef.current) return;
+    if (!dashboardEventId || loadingRef.current) {
+      return;
+    }
     loadingRef.current = true;
+
     try {
       const [eventRes, judgesRes, teamsRes] = await Promise.all([
-        fetch(`/api/events?id=${eventId}`),
-        fetch(`/api/organizer/judges?event_id=${eventId}`),
-        fetch(`/api/organizer/teams?event_id=${eventId}`),
+        fetch(`/api/events?id=${dashboardEventId}`),
+        fetch(`/api/organizer/judges?event_id=${dashboardEventId}`),
+        fetch(`/api/organizer/teams?event_id=${dashboardEventId}`),
       ]);
 
       if (!eventRes.ok || !judgesRes.ok || !teamsRes.ok) {
-        console.warn('Dashboard: one or more API responses not ok');
+        setEvent(null);
+        setJudges([]);
+        setTeams([]);
+        setLocks({});
         return;
       }
 
@@ -53,107 +73,122 @@ function DashboardContent() {
       setJudges(await judgesRes.json());
       setTeams(await teamsRes.json());
 
-      // Get active locks
-      const { data: activeLocks } = await supabase
-        .from('team_locks')
-        .select('team_id, judging_set_id, judging_set:judging_sets(judge_id, judge:judges(name))')
-        .is('released_at', null);
+      try {
+        const { data: activeLocks } = await supabase
+          .from('team_locks')
+          .select('team_id, judging_set_id, judging_set:judging_sets(judge_id, judge:judges(name))')
+          .is('released_at', null);
 
-      const lockMap: Record<string, string> = {};
-      for (const lock of activeLocks || []) {
-        const judgeName = (lock.judging_set as unknown as { judge: { name: string } })?.judge?.name || 'Unknown';
-        lockMap[lock.team_id] = judgeName;
+        const lockMap: Record<string, string> = {};
+        for (const lock of activeLocks || []) {
+          const judgeName =
+            (lock.judging_set as unknown as { judge: { name: string } })?.judge?.name || 'Unknown';
+          lockMap[lock.team_id] = judgeName;
+        }
+        setLocks(lockMap);
+      } catch {
+        setLocks({});
       }
-      setLocks(lockMap);
-    } catch (e) {
-      // Silently swallow fetch errors from realtime bursts — the next interval will retry
-      console.warn('Dashboard load skipped (burst):', (e as Error).message);
+    } catch {
+      setEvent(null);
+      setJudges([]);
+      setTeams([]);
+      setLocks({});
     } finally {
       setLoading(false);
       loadingRef.current = false;
     }
-  }, [eventId]);
+  }, [dashboardEventId]);
 
-  // Debounced version for realtime: coalesces rapid-fire events into one reload
   const debouncedLoadData = useCallback(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
       loadData();
-    }, 500); // Wait 500ms of quiet before reloading
+    }, 450);
   }, [loadData]);
 
-  // Initial load
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  // Auto-refresh every 10 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      loadData();
       setNow(Date.now());
+      loadData();
     }, 10000);
     return () => clearInterval(interval);
   }, [loadData]);
 
-  // Tick the clock every second for timers
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Realtime subscription for live updates (debounced)
   useEffect(() => {
-    if (!eventId) return;
+    if (!dashboardEventId) return;
 
     const channel = supabase
       .channel('dashboard-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'judging_sets', filter: `event_id=eq.${eventId}` }, () => debouncedLoadData())
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'judging_sets', filter: `event_id=eq.${dashboardEventId}` },
+        () => debouncedLoadData()
+      )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'judging_set_teams' }, () => debouncedLoadData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'team_locks' }, () => debouncedLoadData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'judges', filter: `event_id=eq.${eventId}` }, () => debouncedLoadData())
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'judges', filter: `event_id=eq.${dashboardEventId}` },
+        () => debouncedLoadData()
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [eventId, debouncedLoadData]);
+  }, [dashboardEventId, debouncedLoadData]);
 
   const controlEvent = async (action: string) => {
-    if (!eventId) return;
+    if (!dashboardEventId) {
+      return;
+    }
+
     await fetch('/api/organizer/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event_id: eventId, action }),
+      body: JSON.stringify({ event_id: dashboardEventId, action }),
     });
     loadData();
   };
 
-  if (!eventId) {
+  if (loading) {
+    return <div className="py-12 text-center text-muted-foreground">Loading dashboard...</div>;
+  }
+
+  if (!dashboardEventId) {
     return <p>No event selected. <Link href="/" className="underline">Go back</Link></p>;
   }
 
-  if (loading) {
-    return <div className="text-center py-12 text-muted-foreground">Loading...</div>;
+  if (!event) {
+    return <p>No event selected. <Link href="/" className="underline">Go back</Link></p>;
   }
 
-  // Calculate stats
   const totalTeams = teams.length;
   const activeJudges = judges.filter(j => j.status === 'active').length;
   const idleJudges = judges.filter(j => j.status === 'idle').length;
   const breakJudges = judges.filter(j => j.status === 'on_break').length;
-  const targetJudgings = event?.target_judgings_per_team || 3;
+  const targetJudgings = event.target_judgings_per_team || 3;
   const teamsAtTarget = teams.filter(t => t.times_judged >= targetJudgings).length;
   const totalSetsCompleted = judges.reduce((sum, j) => sum + j.sets_completed, 0);
 
-  const getElapsedMinutes = (assignedAt: string) => {
-    return (now - new Date(assignedAt).getTime()) / 60000;
-  };
+  const getElapsedMinutes = (assignedAt: string) => (now - new Date(assignedAt).getTime()) / 60000;
 
-  const getTimeColor = (minutes: number) => {
-    const max = event?.max_judging_minutes || 20;
-    if (minutes < max * 0.5) return 'text-green-600';
-    if (minutes < max * 0.8) return 'text-yellow-600';
-    return 'text-red-600';
+  const getElapsedTone = (minutes: number) => {
+    const max = event.max_judging_minutes || 20;
+    if (minutes < max * 0.5) return 'bg-emerald-100 text-emerald-800';
+    if (minutes < max * 0.8) return 'bg-amber-100 text-amber-800';
+    return 'bg-rose-100 text-rose-800';
   };
 
   const formatElapsed = (assignedAt: string) => {
@@ -163,240 +198,224 @@ function DashboardContent() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  const sortedTeams = [...teams].sort((a, b) => a.times_judged - b.times_judged || a.name.localeCompare(b.name));
+
   return (
-    <div className="space-y-6">
-      <Card className={`shadow-sm ${event?.status === 'active' ? 'border-emerald-200 bg-emerald-50/40' : 'border-border/60'}`}>
-        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-2">
+    <div className="space-y-8">
+      <section className="space-y-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3">
             <Badge
-              variant={event?.status === 'active' ? 'default' : 'secondary'}
-              className={event?.status === 'active' ? 'w-fit bg-emerald-600 text-white' : 'w-fit'}
+              variant="secondary"
+              className={
+                event.status === 'active'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : event.status === 'paused'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-stone-100 text-stone-700'
+              }
             >
-              {event?.status}
+              {event.status}
             </Badge>
-            <div className="space-y-1">
-              <h1 className="text-2xl font-semibold text-balance">{event?.name} live dashboard</h1>
-              <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
-                Keep an eye on judge progress, active locks, and event health. The dashboard refreshes automatically every 10 seconds.
+            <div className="space-y-2">
+              <h1 className="text-base font-semibold tracking-[-0.02em] text-balance">
+                {event.name}
+              </h1>
+              <p className="max-w-2xl text-sm leading-7 text-muted-foreground text-pretty">
+                A minimal live view of judging progress, team coverage, and active sets.
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {event?.status === 'active' && (
+          <div className="flex flex-wrap gap-2.5">
+            {event.status === 'active' && (
               <>
-                <Button size="sm" variant="outline" onClick={() => controlEvent('pause')}>Pause event</Button>
-                <Button size="sm" variant="destructive" onClick={() => controlEvent('complete')}>End judging</Button>
+                <Button size="sm" variant="outline" onClick={() => controlEvent('pause')}>
+                  Pause event
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => controlEvent('complete')}>
+                  End judging
+                </Button>
               </>
             )}
-            {event?.status === 'paused' && (
-              <Button size="sm" onClick={() => controlEvent('start')}>Resume event</Button>
+            {event.status === 'paused' && (
+              <Button size="sm" onClick={() => controlEvent('start')}>
+                Resume event
+              </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-        <Card className="border-border/60 shadow-sm">
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold">{totalTeams}</p>
-            <p className="text-xs text-muted-foreground">Total Teams</p>
-          </CardContent>
-        </Card>
-        <Card className="border-emerald-200 bg-emerald-50/50 shadow-sm">
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold text-emerald-700">{activeJudges}</p>
-            <p className="text-xs text-muted-foreground">Active Judges</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/60 shadow-sm">
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold">{idleJudges}</p>
-            <p className="text-xs text-muted-foreground">Idle Judges</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/60 shadow-sm">
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold">{breakJudges}</p>
-            <p className="text-xs text-muted-foreground">On Break</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/60 shadow-sm">
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold">{totalSetsCompleted}</p>
-            <p className="text-xs text-muted-foreground">Sets Done</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/60 shadow-sm">
-          <CardContent className="p-4 text-center">
-            <p className="text-3xl font-bold">{teamsAtTarget}/{totalTeams}</p>
-            <p className="text-xs text-muted-foreground">At Target ({targetJudgings})</p>
-          </CardContent>
-        </Card>
-      </div>
+      <section className="grid gap-x-6 gap-y-5 sm:grid-cols-2 xl:grid-cols-6">
+        <DashboardMetric label="Total teams" value={`${totalTeams}`} tone="bg-sky-100 text-sky-800" />
+        <DashboardMetric label="Active judges" value={`${activeJudges}`} tone="bg-emerald-100 text-emerald-800" />
+        <DashboardMetric label="Idle judges" value={`${idleJudges}`} tone="bg-violet-100 text-violet-800" />
+        <DashboardMetric label="On break" value={`${breakJudges}`} tone="bg-amber-100 text-amber-800" />
+        <DashboardMetric label="Sets done" value={`${totalSetsCompleted}`} tone="bg-rose-100 text-rose-800" />
+        <DashboardMetric label="At target" value={`${teamsAtTarget}/${totalTeams}`} tone="bg-orange-100 text-orange-800" />
+      </section>
 
-      <Tabs defaultValue="judges">
-        <TabsList variant="line" className="w-fit">
-          <TabsTrigger value="judges">Judges ({judges.length})</TabsTrigger>
-          <TabsTrigger value="teams">Teams ({teams.length})</TabsTrigger>
-        </TabsList>
+      <section className="flex flex-wrap items-center gap-2.5">
+        <Button
+          size="sm"
+          variant={view === 'judges' ? 'default' : 'ghost'}
+          className={view === 'judges' ? 'bg-stone-900 text-white' : 'text-muted-foreground'}
+          onClick={() => setView('judges')}
+        >
+          Judges
+        </Button>
+        <Button
+          size="sm"
+          variant={view === 'teams' ? 'default' : 'ghost'}
+          className={view === 'teams' ? 'bg-stone-900 text-white' : 'text-muted-foreground'}
+          onClick={() => setView('teams')}
+        >
+          Teams
+        </Button>
+      </section>
 
-        {/* JUDGES TAB */}
-        <TabsContent value="judges" className="mt-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {judges.map(judge => {
-              const hasActiveSet = !!judge.active_set;
-              const elapsed = hasActiveSet ? getElapsedMinutes(judge.active_set!.assigned_at) : 0;
-              const timeColor = hasActiveSet ? getTimeColor(elapsed) : '';
+      {view === 'judges' ? (
+        <section className="grid gap-x-8 gap-y-8 lg:grid-cols-2 xl:grid-cols-3">
+          {judges.map(judge => {
+            const hasActiveSet = !!judge.active_set;
+            const elapsed = hasActiveSet ? getElapsedMinutes(judge.active_set!.assigned_at) : 0;
 
-              return (
-                <Card key={judge.id} className={`shadow-sm ${
-                  judge.status === 'on_break' ? 'opacity-70' :
-                  hasActiveSet && elapsed > (event?.max_judging_minutes || 20) ? 'border-amber-200 bg-amber-50/40 ring-1 ring-amber-200' :
-                  hasActiveSet ? 'border-emerald-200 bg-emerald-50/35 ring-1 ring-emerald-200' : 'border-border/60'
-                }`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{judge.name}</h3>
-                        <Badge variant="outline" className="text-xs font-mono">{judge.access_code}</Badge>
-                      </div>
-                      <Badge
-                        variant={
-                          judge.status === 'active' ? 'default' :
-                          judge.status === 'on_break' ? 'secondary' : 'outline'
-                        }
-                        className={
-                          judge.status === 'active'
-                            ? 'bg-emerald-600 text-white'
-                            : judge.status === 'on_break'
-                              ? 'bg-amber-100 text-amber-800'
-                              : ''
-                        }
-                      >
-                        {judge.status === 'active' ? 'Judging' :
-                         judge.status === 'on_break' ? 'Break' : 'Idle'}
-                      </Badge>
+            return (
+              <article key={judge.id} className="space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-base font-semibold">{judge.name}</h2>
+                      <span className="rounded-lg bg-stone-100 px-2.5 py-1 text-[11px] font-medium tabular-nums text-stone-600">
+                        {judge.access_code}
+                      </span>
                     </div>
-
-                    <div className="text-sm text-muted-foreground mb-2">
+                    <p className="text-sm text-muted-foreground">
                       {judge.sets_completed} sets completed
-                      {judge.current_room && ` · Last: ${(judge.current_room as Room).name}`}
+                      {judge.current_room ? ` · Last room ${judge.current_room.name}` : ''}
+                    </p>
+                  </div>
+
+                  <Badge
+                    variant="secondary"
+                    className={
+                      judge.status === 'active'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : judge.status === 'on_break'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-sky-100 text-sky-800'
+                    }
+                  >
+                    {judge.status === 'active' ? 'Live judging' : judge.status === 'on_break' ? 'On break' : 'Idle'}
+                  </Badge>
+                </div>
+
+                {hasActiveSet ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">Current set</p>
+                      <span className={`rounded-lg px-2.5 py-1 text-xs font-medium tabular-nums ${getElapsedTone(elapsed)}`}>
+                        {formatElapsed(judge.active_set!.assigned_at)}
+                      </span>
                     </div>
 
-                    {hasActiveSet && (
-                      <>
-                        <Separator className="my-2" />
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-muted-foreground">Current set</span>
-                          <span className={`text-sm font-mono font-semibold ${timeColor}`}>
-                            {formatElapsed(judge.active_set!.assigned_at)}
-                          </span>
-                        </div>
-                        <div className="space-y-1.5">
-                          {judge.active_set!.judging_set_teams
-                            ?.sort((a, b) => a.visit_order - b.visit_order)
-                            .map(st => (
-                            <div key={st.id} className={`flex items-start gap-2 rounded-md px-2 py-1.5 text-xs ${
-                              st.is_visited ? 'bg-emerald-100/80 text-emerald-950' : 'bg-background/70'
-                            }`}>
-                              <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] ${
-                                st.is_visited ? 'bg-emerald-600 text-white' : 'bg-muted-foreground/20'
-                              }`}>
-                                {st.is_visited ? '✓' : st.visit_order}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-sm truncate">
-                                  {st.team?.name || 'Unknown'}
-                                </div>
-                                <div className="text-muted-foreground">
-                                  {st.team?.room?.name} · #{st.team?.team_number}
-                                </div>
+                    <ul className="space-y-2">
+                      {judge.active_set!.judging_set_teams
+                        .slice()
+                        .sort((a, b) => a.visit_order - b.visit_order)
+                        .map(setTeam => (
+                          <li key={setTeam.id} className="flex items-start gap-3">
+                            <span className={`mt-0.5 inline-flex rounded-lg px-2 py-1 text-[11px] font-medium ${
+                              setTeam.is_visited ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-600'
+                            }`} aria-hidden="true">
+                              {setTeam.visit_order}
+                            </span>
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-medium">{setTeam.team?.name || 'Unknown team'}</span>
+                                {setTeam.is_visited && (
+                                  <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] text-emerald-800">
+                                    visited
+                                  </span>
+                                )}
                               </div>
+                              <p className="text-sm text-muted-foreground">
+                                {setTeam.team?.room?.name} · #{setTeam.team?.team_number}
+                              </p>
                             </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </TabsContent>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {judge.status === 'on_break'
+                      ? 'Away from the queue for now.'
+                      : 'Ready for the next assignment.'}
+                  </p>
+                )}
+              </article>
+            );
+          })}
+        </section>
+      ) : (
+        <section className="space-y-4">
+          {sortedTeams.map(team => {
+            const isLocked = !!locks[team.id];
+            const isAtTarget = team.times_judged >= targetJudgings;
 
-        {/* TEAMS TAB */}
-        <TabsContent value="teams" className="mt-4">
-          <Card className="border-border/60 shadow-sm">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left p-3 font-medium">Team</th>
-                      <th className="text-left p-3 font-medium">Project</th>
-                      <th className="text-left p-3 font-medium">Room</th>
-                      <th className="text-left p-3 font-medium">Team #</th>
-                      <th className="text-center p-3 font-medium">Floor</th>
-                      <th className="text-center p-3 font-medium">Times Judged</th>
-                      <th className="text-left p-3 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {teams
-                      .sort((a, b) => a.times_judged - b.times_judged)
-                      .map(team => {
-                        const isLocked = !!locks[team.id];
-                        const judgingDeficit = targetJudgings - team.times_judged;
+            return (
+              <article
+                key={team.id}
+                className="grid gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto] sm:items-center"
+              >
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-sm font-medium">{team.name}</h2>
+                    <span className="rounded-lg bg-stone-100 px-2.5 py-1 text-[11px] text-stone-600">
+                      #{team.team_number}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {team.project_name || 'No project title'} · {team.room?.name || '?'} · Floor {team.room?.floor || '?'}
+                  </p>
+                </div>
 
-                        return (
-                          <tr key={team.id} className={`border-b ${
-                            isLocked ? 'bg-blue-50/50' :
-                            team.times_judged >= targetJudgings ? 'bg-green-50/30' :
-                            judgingDeficit > 1 ? 'bg-orange-50/30' : ''
-                          }`}>
-                            <td className="p-3 font-medium">{team.name}</td>
-                            <td className="p-3 text-muted-foreground">{team.project_name || '—'}</td>
-                            <td className="p-3">{team.room?.name || '?'}</td>
-                            <td className="p-3">{team.team_number}</td>
-                            <td className="p-3 text-center">{team.room?.floor || '?'}</td>
-                            <td className="p-3 text-center">
-                              <Badge variant={
-                                team.times_judged >= targetJudgings ? 'default' :
-                                team.times_judged === 0 ? 'destructive' : 'secondary'
-                              }>
-                                {team.times_judged}/{targetJudgings}
-                              </Badge>
-                            </td>
-                            <td className="p-3">
-                              {isLocked ? (
-                                <Badge variant="outline" className="text-blue-600">
-                                  Being judged by {locks[team.id]}
-                                </Badge>
-                              ) : team.times_judged >= targetJudgings ? (
-                                <Badge variant="outline" className="text-green-600">Done</Badge>
-                              ) : (
-                                <span className="text-muted-foreground">Waiting</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                <div className="flex flex-wrap gap-2">
+                  <span
+                    className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
+                      isLocked
+                        ? 'bg-sky-100 text-sky-800'
+                        : isAtTarget
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-orange-100 text-orange-800'
+                    }`}
+                  >
+                    {isLocked
+                      ? `Live with ${locks[team.id]}`
+                      : isAtTarget
+                        ? 'At target'
+                        : 'Needs more coverage'}
+                  </span>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <p className="text-sm font-semibold tabular-nums">{team.times_judged}/{targetJudgings}</p>
+                  <p className="text-xs text-muted-foreground">judgings</p>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      )}
     </div>
   );
 }
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<div className="text-center py-12 text-muted-foreground">Loading...</div>}>
+    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">Loading dashboard...</div>}>
       <DashboardContent />
     </Suspense>
   );

@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -251,12 +250,12 @@ function SetupPageContent() {
   };
 
   const deleteRoom = async (id: string) => {
-    await fetch(`/api/organizer/rooms?id=${id}`, { method: 'DELETE' });
+    await fetch(`/api/organizer/rooms?id=${id}&event_id=${eventId}`, { method: 'DELETE' });
     loadData();
   };
 
   const deleteTeam = async (id: string) => {
-    await fetch(`/api/organizer/teams?id=${id}`, { method: 'DELETE' });
+    await fetch(`/api/organizer/teams?id=${id}&event_id=${eventId}`, { method: 'DELETE' });
     loadData();
   };
 
@@ -285,14 +284,14 @@ function SetupPageContent() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-border/60 bg-background shadow-sm">
-        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-end lg:justify-between">
+      <section className="grid gap-4 pb-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-3">
             <div className="space-y-1">
               <Badge variant={event?.status === 'active' ? 'default' : 'secondary'} className="w-fit">
                 {event?.status || 'setup'}
               </Badge>
-              <h1 className="text-2xl font-semibold text-balance">
+              <h1 className="text-base font-semibold text-balance">
                 {event?.name || 'Event'} setup
               </h1>
               <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
@@ -301,29 +300,29 @@ function SetupPageContent() {
             </div>
 
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-              <span className="rounded-full border border-border/60 bg-muted/40 px-3 py-1">{teams.length} teams</span>
-              <span className="rounded-full border border-border/60 bg-muted/40 px-3 py-1">{judges.length} judges</span>
-              <span className="rounded-full border border-border/60 bg-muted/40 px-3 py-1">{rooms.length} rooms</span>
+              <span className="rounded-lg bg-muted/50 px-3 py-1">{teams.length} teams</span>
+              <span className="rounded-lg bg-muted/50 px-3 py-1">{judges.length} judges</span>
+              <span className="rounded-lg bg-muted/50 px-3 py-1">{rooms.length} rooms</span>
             </div>
           </div>
+        </div>
 
-          <div className="flex flex-wrap gap-2">
-            {event?.status === 'setup' && teams.length > 0 && judges.length > 0 && (
-              <Button onClick={startEvent}>Start judging</Button>
-            )}
-            {event?.status === 'active' && (
-              <Button onClick={() => router.push(`/organizer/dashboard?event=${eventId}`)}>
-                Open dashboard
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          {event?.status === 'setup' && teams.length > 0 && judges.length > 0 && (
+            <Button onClick={startEvent}>Start judging</Button>
+          )}
+          {event?.status === 'active' && (
+            <Button onClick={() => router.push(`/organizer/dashboard?event=${eventId}`)}>
+              Open dashboard
+            </Button>
+          )}
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ROOMS */}
-        <Card className="border-border/60 shadow-sm">
-          <CardHeader className="border-b border-border/60 pb-4">
+        <Card className="pt-0 shadow-none">
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Rooms</CardTitle>
@@ -387,11 +386,9 @@ function SetupPageContent() {
               </div>
             )}
 
-            <Separator />
-
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {rooms.map(room => (
-                <div key={room.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm">
+                <div key={room.id} className="flex items-center justify-between rounded-lg bg-muted/35 px-3 py-2 text-sm">
                   <div>
                     <span className="font-medium">{room.name}</span>
                     <span className="text-muted-foreground ml-2">#{room.room_number} · F{room.floor}</span>
@@ -405,8 +402,8 @@ function SetupPageContent() {
         </Card>
 
         {/* TEAMS */}
-        <Card className="border-border/60 shadow-sm">
-          <CardHeader className="border-b border-border/60 pb-4">
+        <Card className="pt-0 shadow-none">
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Teams ({teams.length})</CardTitle>
@@ -469,11 +466,9 @@ function SetupPageContent() {
               </div>
             )}
 
-            <Separator />
-
             <div className="space-y-1 max-h-64 overflow-y-auto">
               {teams.map(team => (
-                <div key={team.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm">
+                <div key={team.id} className="flex items-center justify-between rounded-lg bg-muted/35 px-3 py-2 text-sm">
                   <div className="min-w-0 flex-1">
                     <span className="font-medium truncate block">{team.name}</span>
                     <span className="text-xs text-muted-foreground">
@@ -489,12 +484,12 @@ function SetupPageContent() {
         </Card>
 
         {/* JUDGES */}
-        <Card className="border-border/60 shadow-sm">
-          <CardHeader className="border-b border-border/60 pb-4">
+        <Card className="pt-0 shadow-none">
+          <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Judges ({judges.length})</CardTitle>
-                <CardDescription>Each judge gets a unique access code and login path.</CardDescription>
+                <CardDescription>Each judge gets a unique access code.</CardDescription>
               </div>
               <Button size="sm" variant="outline" onClick={() => setShowBulkJudgeImport(!showBulkJudgeImport)}>
                 {showBulkJudgeImport ? 'Single' : 'Bulk Import'}
@@ -508,7 +503,7 @@ function SetupPageContent() {
                 <Textarea
                   aria-label="Bulk judge import"
                   className="min-h-[120px] font-mono text-sm"
-                  placeholder={`Alice Johnson, ALICE1\nBob Smith, BOB42\nCharlie Brown`}
+                  placeholder={`Alice Johnson, JUDGE-001\nBob Smith, JUDGE-002\nCharlie Brown`}
                   value={bulkJudges}
                   onChange={e => setBulkJudges(e.target.value)}
                 />
@@ -534,11 +529,9 @@ function SetupPageContent() {
               </div>
             )}
 
-            <Separator />
-
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {judges.map(j => (
-                <div key={j.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm">
+                <div key={j.id} className="flex items-center justify-between rounded-lg bg-muted/35 px-3 py-2 text-sm">
                   <div>
                     <span className="font-medium">{j.name}</span>
                     <Badge variant="outline" className="ml-2 font-mono text-xs">{j.access_code}</Badge>
@@ -553,14 +546,12 @@ function SetupPageContent() {
       </div>
 
       {/* Event Configuration */}
-      <Card className="border-border/60 shadow-sm">
-        <CardHeader className="border-b border-border/60 pb-4">
+      <Card className="pt-0 shadow-none">
+        <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Event Configuration</CardTitle>
-              <CardDescription>
-                Admin code: <code className="font-mono bg-muted px-1 rounded">{event?.admin_code}</code>
-              </CardDescription>
+              <CardDescription>Update the event name, pacing, and judging targets before it goes live.</CardDescription>
             </div>
             {event?.status === 'setup' && !editingConfig && (
               <Button size="sm" variant="outline" onClick={startEditingConfig}>Edit</Button>
@@ -627,15 +618,15 @@ function SetupPageContent() {
           ) : (
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <p className="text-2xl font-bold">{event?.set_size}</p>
+                <p className="text-base font-semibold">{event?.set_size}</p>
                 <p className="text-xs text-muted-foreground">Teams per Set</p>
               </div>
               <div>
-                <p className="text-2xl font-bold">{event?.target_judgings_per_team}</p>
+                <p className="text-base font-semibold">{event?.target_judgings_per_team}</p>
                 <p className="text-xs text-muted-foreground">Target Judgings/Team</p>
               </div>
               <div>
-                <p className="text-2xl font-bold">{event?.max_judging_minutes}m</p>
+                <p className="text-base font-semibold">{event?.max_judging_minutes}m</p>
                 <p className="text-xs text-muted-foreground">Max Time per Set</p>
               </div>
             </div>
