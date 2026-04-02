@@ -12,20 +12,35 @@ import type { JudgingSetWithTeams } from './types';
 // This guarantees no team is ever assigned to two judges simultaneously.
 
 async function releaseInactiveJudgeAssignments(eventId: string): Promise<void> {
+  const { data: inactiveJudges, error: inactiveJudgeError } = await supabase
+    .from('judges')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('is_active', false);
+
+  if (inactiveJudgeError) {
+    console.error('Failed to inspect inactive judges:', inactiveJudgeError.message);
+    return;
+  }
+
+  const inactiveJudgeIds = (inactiveJudges || []).map(judge => judge.id);
+  if (inactiveJudgeIds.length === 0) {
+    return;
+  }
+
   const { data: abandonedSets, error: abandonedSetError } = await supabase
     .from('judging_sets')
-    .select('id, judge:judges(is_active)')
+    .select('id')
     .eq('event_id', eventId)
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .in('judge_id', inactiveJudgeIds);
 
   if (abandonedSetError) {
     console.error('Failed to inspect active judging sets:', abandonedSetError.message);
     return;
   }
 
-  const abandonedSetIds = (abandonedSets || [])
-    .filter(set => (set.judge as { is_active?: boolean } | null)?.is_active === false)
-    .map(set => set.id);
+  const abandonedSetIds = (abandonedSets || []).map(set => set.id);
 
   if (abandonedSetIds.length === 0) {
     return;
@@ -68,6 +83,217 @@ async function cleanupStaleAssignments(eventId: string): Promise<void> {
   }
 }
 
+async function fetchFullSet(judgingSetId: string): Promise<JudgingSetWithTeams | null> {
+  const { data: fullSet, error: fetchError } = await supabase
+    .from('judging_sets')
+    .select(`
+      *,
+      judging_set_teams(
+        *,
+        team:teams(*, room:rooms(*))
+      )
+    `)
+    .eq('id', judgingSetId)
+    .single();
+
+  if (fetchError || !fullSet) {
+    console.error('Failed to fetch created set:', fetchError);
+    return null;
+  }
+
+  return fullSet as JudgingSetWithTeams;
+}
+
+async function fallbackAssignNextSet(
+  judgeId: string,
+  eventId: string
+): Promise<JudgingSetWithTeams | null> {
+  const [{ data: eventConfig, error: eventError }, { data: judge, error: judgeError }] = await Promise.all([
+    supabase
+      .from('events')
+      .select('set_size, target_judgings_per_team, status')
+      .eq('id', eventId)
+      .single(),
+    supabase
+      .from('judges')
+      .select('is_active, current_room_id')
+      .eq('id', judgeId)
+      .single(),
+  ]);
+
+  if (eventError || !eventConfig) {
+    console.error('Fallback assignment could not load event config:', eventError?.message);
+    return null;
+  }
+
+  if (judgeError || !judge) {
+    console.error('Fallback assignment could not load judge:', judgeError?.message);
+    return null;
+  }
+
+  if (eventConfig.status !== 'active' || judge.is_active === false) {
+    return null;
+  }
+
+  let judgeFloor: number | null = null;
+  if (judge.current_room_id) {
+    const { data: judgeRoom, error: roomError } = await supabase
+      .from('rooms')
+      .select('floor')
+      .eq('id', judge.current_room_id)
+      .single();
+
+    if (!roomError && judgeRoom) {
+      judgeFloor = judgeRoom.floor;
+    }
+  }
+
+  const [{ data: teams, error: teamsError }, { data: activeLocks, error: locksError }] = await Promise.all([
+    supabase
+      .from('teams')
+      .select('*, room:rooms(*)')
+      .eq('event_id', eventId)
+      .eq('is_active', true),
+    supabase
+      .from('team_locks')
+      .select('team_id')
+      .is('released_at', null),
+  ]);
+
+  if (teamsError || !teams) {
+    console.error('Fallback assignment could not load teams:', teamsError?.message);
+    return null;
+  }
+
+  if (locksError) {
+    console.error('Fallback assignment could not load active locks:', locksError.message);
+    return null;
+  }
+
+  const lockedTeamIds = new Set((activeLocks || []).map(lock => lock.team_id));
+  const availableTeams = (teams as Array<{
+    id: string;
+    room_id: string;
+    times_judged: number;
+    room?: { floor: number; room_number: number };
+  }>).filter(team => !lockedTeamIds.has(team.id) && team.room);
+
+  if (availableTeams.length === 0) {
+    return null;
+  }
+
+  const floorStats = new Map<number, { floor: number; available: number; underTarget: number }>();
+  for (const team of availableTeams) {
+    const floor = team.room!.floor;
+    const current = floorStats.get(floor) || { floor, available: 0, underTarget: 0 };
+    current.available += 1;
+    if (team.times_judged < eventConfig.target_judgings_per_team) {
+      current.underTarget += 1;
+    }
+    floorStats.set(floor, current);
+  }
+
+  const bestFloor = [...floorStats.values()]
+    .sort((a, b) => {
+      if (b.underTarget !== a.underTarget) return b.underTarget - a.underTarget;
+      if (b.available !== a.available) return b.available - a.available;
+      if (judgeFloor !== null) {
+        if (a.floor === judgeFloor && b.floor !== judgeFloor) return -1;
+        if (b.floor === judgeFloor && a.floor !== judgeFloor) return 1;
+      }
+      return a.floor - b.floor;
+    })[0]?.floor;
+
+  if (bestFloor === undefined) {
+    return null;
+  }
+
+  const candidates = availableTeams
+    .filter(team => team.room!.floor === bestFloor)
+    .sort((a, b) => {
+      if (a.times_judged !== b.times_judged) return a.times_judged - b.times_judged;
+      return a.room!.room_number - b.room!.room_number;
+    });
+
+  const assignedAt = new Date().toISOString();
+  const { data: createdSet, error: setError } = await supabase
+    .from('judging_sets')
+    .insert({
+      event_id: eventId,
+      judge_id: judgeId,
+      status: 'active',
+      assigned_at: assignedAt,
+    })
+    .select('id')
+    .single();
+
+  if (setError || !createdSet) {
+    console.error('Fallback assignment could not create judging set:', setError?.message);
+    return null;
+  }
+
+  const assignedTeams: Array<{ id: string; room_id: string }> = [];
+
+  for (const candidate of candidates) {
+    if (assignedTeams.length >= eventConfig.set_size) {
+      break;
+    }
+
+    const { error: lockError } = await supabase
+      .from('team_locks')
+      .insert({
+        team_id: candidate.id,
+        judging_set_id: createdSet.id,
+      });
+
+    if (lockError) {
+      if (lockError.code === '23505') {
+        continue;
+      }
+
+      console.error('Fallback assignment could not create team lock:', lockError.message);
+      break;
+    }
+
+    const visitOrder = assignedTeams.length + 1;
+    const { error: setTeamError } = await supabase
+      .from('judging_set_teams')
+      .insert({
+        judging_set_id: createdSet.id,
+        team_id: candidate.id,
+        visit_order: visitOrder,
+      });
+
+    if (setTeamError) {
+      console.error('Fallback assignment could not create set team:', setTeamError.message);
+      await supabase
+        .from('team_locks')
+        .update({ released_at: new Date().toISOString() })
+        .eq('judging_set_id', createdSet.id)
+        .eq('team_id', candidate.id)
+        .is('released_at', null);
+      break;
+    }
+
+    assignedTeams.push({ id: candidate.id, room_id: candidate.room_id });
+  }
+
+  if (assignedTeams.length === 0) {
+    await supabase.from('judging_sets').delete().eq('id', createdSet.id);
+    return null;
+  }
+
+  await supabase
+    .from('judges')
+    .update({
+      status: 'active',
+      current_room_id: assignedTeams[0].room_id,
+    })
+    .eq('id', judgeId);
+
+  return fetchFullSet(createdSet.id);
+}
+
 export async function assignNextSet(
   judgeId: string,
   eventId: string
@@ -83,33 +309,15 @@ export async function assignNextSet(
 
   if (rpcError) {
     console.error('Assignment RPC error:', rpcError.message);
-    return null;
+    return fallbackAssignNextSet(judgeId, eventId);
   }
 
   if (!setId) {
     console.error('No set ID returned from assignment');
-    return null;
+    return fallbackAssignNextSet(judgeId, eventId);
   }
 
-  // Fetch the full set with team details
-  const { data: fullSet, error: fetchError } = await supabase
-    .from('judging_sets')
-    .select(`
-      *,
-      judging_set_teams(
-        *,
-        team:teams(*, room:rooms(*))
-      )
-    `)
-    .eq('id', setId)
-    .single();
-
-  if (fetchError || !fullSet) {
-    console.error('Failed to fetch created set:', fetchError);
-    return null;
-  }
-
-  return fullSet as JudgingSetWithTeams;
+  return fetchFullSet(setId);
 }
 
 export async function reclaimActiveAssignmentsForJudge(judgeId: string): Promise<boolean> {
