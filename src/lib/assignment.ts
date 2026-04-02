@@ -11,10 +11,69 @@ import type { JudgingSetWithTeams } from './types';
 // 4. Creates the judging set and team assignments
 // This guarantees no team is ever assigned to two judges simultaneously.
 
+async function releaseInactiveJudgeAssignments(eventId: string): Promise<void> {
+  const { data: abandonedSets, error: abandonedSetError } = await supabase
+    .from('judging_sets')
+    .select('id, judge:judges(is_active)')
+    .eq('event_id', eventId)
+    .eq('status', 'active');
+
+  if (abandonedSetError) {
+    console.error('Failed to inspect active judging sets:', abandonedSetError.message);
+    return;
+  }
+
+  const abandonedSetIds = (abandonedSets || [])
+    .filter(set => (set.judge as { is_active?: boolean } | null)?.is_active === false)
+    .map(set => set.id);
+
+  if (abandonedSetIds.length === 0) {
+    return;
+  }
+
+  const reclaimedAt = new Date().toISOString();
+
+  const { error: lockReleaseError } = await supabase
+    .from('team_locks')
+    .update({ released_at: reclaimedAt })
+    .in('judging_set_id', abandonedSetIds)
+    .is('released_at', null);
+
+  if (lockReleaseError) {
+    console.error('Failed to release locks for inactive judge sets:', lockReleaseError.message);
+  }
+}
+
+async function cleanupStaleAssignments(eventId: string): Promise<void> {
+  const { data: eventConfig, error: eventError } = await supabase
+    .from('events')
+    .select('max_judging_minutes')
+    .eq('id', eventId)
+    .single();
+
+  if (eventError || !eventConfig) {
+    console.error('Failed to load event config for stale assignment cleanup:', eventError?.message);
+    return;
+  }
+
+  await releaseInactiveJudgeAssignments(eventId);
+
+  const { error: releaseError } = await supabase.rpc('release_expired_locks', {
+    p_event_id: eventId,
+    p_max_minutes: eventConfig.max_judging_minutes,
+  });
+
+  if (releaseError) {
+    console.error('Failed to release expired locks:', releaseError.message);
+  }
+}
+
 export async function assignNextSet(
   judgeId: string,
   eventId: string
 ): Promise<JudgingSetWithTeams | null> {
+  await cleanupStaleAssignments(eventId);
+
   // Call the atomic RPC function
   const { data: setId, error: rpcError } = await supabase
     .rpc('assign_set_to_judge', {
@@ -51,6 +110,39 @@ export async function assignNextSet(
   }
 
   return fullSet as JudgingSetWithTeams;
+}
+
+export async function reclaimActiveAssignmentsForJudge(judgeId: string): Promise<boolean> {
+  const { data: activeSets, error: setFetchError } = await supabase
+    .from('judging_sets')
+    .select('id')
+    .eq('judge_id', judgeId)
+    .eq('status', 'active');
+
+  if (setFetchError) {
+    console.error('Failed to load active judging sets:', setFetchError.message);
+    return false;
+  }
+
+  const activeSetIds = (activeSets || []).map(set => set.id);
+  if (activeSetIds.length === 0) {
+    return true;
+  }
+
+  const reclaimedAt = new Date().toISOString();
+
+  const { error: lockReleaseError } = await supabase
+    .from('team_locks')
+    .update({ released_at: reclaimedAt })
+    .in('judging_set_id', activeSetIds)
+    .is('released_at', null);
+
+  if (lockReleaseError) {
+    console.error('Failed to release team locks for reclaimed sets:', lockReleaseError.message);
+    return false;
+  }
+
+  return true;
 }
 
 // ============================================

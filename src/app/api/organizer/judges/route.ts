@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { assignGeneratedJudgeCodes } from '@/lib/judge-codes';
+import { reclaimActiveAssignmentsForJudge } from '@/lib/assignment';
 import { supabase } from '@/lib/supabase';
 
 // GET: list judges for an event with their active sets
@@ -11,6 +12,7 @@ export async function GET(req: NextRequest) {
     .from('judges')
     .select('*, current_room:rooms(*)')
     .eq('event_id', eventId)
+    .eq('is_active', true)
     .order('name');
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -83,9 +85,14 @@ export async function DELETE(req: NextRequest) {
   const judgeId = req.nextUrl.searchParams.get('id');
   if (!judgeId) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
+  const reclaimed = await reclaimActiveAssignmentsForJudge(judgeId);
+  if (!reclaimed) {
+    return NextResponse.json({ error: 'Failed to reclaim the judge assignments' }, { status: 400 });
+  }
+
   const { error } = await supabase
     .from('judges')
-    .update({ is_active: false })
+    .update({ is_active: false, status: 'idle', current_room_id: null })
     .eq('id', judgeId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
