@@ -27,6 +27,7 @@ export interface Team {
   event_id: string;
   name: string;
   project_name: string | null;
+  track: string | null;
   team_number: string;
   room_id: string;
   times_judged: number;
@@ -105,6 +106,7 @@ export interface TeamStats {
   id: string;
   name: string;
   project_name: string | null;
+  track: string | null;
   team_number: string;
   room_name: string;
   floor: number;

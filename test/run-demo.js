@@ -82,6 +82,7 @@ async function setupEvent() {
     target_judgings_per_team: 3,
     max_judging_minutes: 5,
     admin_code: 'DEMO-ADMIN',
+    password: 'hehe1414',
   });
   log(`Event created: ${event.name} (${event.id})`);
   return event;

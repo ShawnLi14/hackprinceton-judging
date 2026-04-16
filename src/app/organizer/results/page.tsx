@@ -18,6 +18,7 @@ interface TeamResult {
   id: string;
   name: string;
   project_name: string | null;
+  track: string | null;
   team_number: string;
   room_name: string;
   floor: number;
@@ -48,9 +49,9 @@ function ResultsContent() {
   const bestScore = judgedTeams.length ? Math.max(...judgedTeams.map(result => result.score ?? 0)) : null;
 
   const exportCSV = () => {
-    const header = 'Rank,Team,Project,Average Score (/5),Times Judged,Score Entries,Room,Floor,Team #\n';
+    const header = 'Rank,Team,Project,Track,Average Score (/5),Times Judged,Score Entries,Room,Floor,Team #\n';
     const rows = results.map((result, idx) =>
-      `${idx + 1},"${result.name}","${result.project_name || ''}",${result.score !== null ? result.score.toFixed(1) : 'N/A'},${result.times_judged},${result.num_rankings},"${result.room_name}",${result.floor},${result.team_number}`
+      `${idx + 1},"${result.name}","${result.project_name || ''}","${result.track || ''}",${result.score !== null ? result.score.toFixed(1) : 'N/A'},${result.times_judged},${result.num_rankings},"${result.room_name}",${result.floor},${result.team_number}`
     ).join('\n');
 
     const blob = new Blob([header + rows], { type: 'text/csv' });
@@ -70,6 +71,8 @@ function ResultsContent() {
     return <div className="py-12 text-center text-muted-foreground">Loading...</div>;
   }
 
+  const hasTracks = results.some(r => r.track);
+
   return (
     <div className="space-y-8">
       <section className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
@@ -78,7 +81,7 @@ function ResultsContent() {
             <div className="space-y-1">
               <h1 className="text-base font-semibold text-balance">Judging results</h1>
               <p className="text-sm text-muted-foreground text-pretty">
-                Teams are sorted by average score on a 1 to 5 scale, where 5 is the strongest result.
+                Teams are sorted by {hasTracks ? 'track, then by ' : ''}average score on a 1 to 5 scale, where 5 is the strongest result.
               </p>
             </div>
 
@@ -105,6 +108,7 @@ function ResultsContent() {
             <TableHead className="w-16 text-center text-xs font-medium text-muted-foreground">Rank</TableHead>
             <TableHead className="text-xs font-medium text-muted-foreground">Team</TableHead>
             <TableHead className="text-xs font-medium text-muted-foreground">Project</TableHead>
+            {hasTracks && <TableHead className="text-xs font-medium text-muted-foreground">Track</TableHead>}
             <TableHead className="text-center text-xs font-medium text-muted-foreground">Score</TableHead>
             <TableHead className="text-center text-xs font-medium text-muted-foreground">Judgings</TableHead>
             <TableHead className="text-center text-xs font-medium text-muted-foreground">Entries</TableHead>
@@ -113,53 +117,74 @@ function ResultsContent() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {results.map((team, idx) => {
-            const score = team.score;
+          {(() => {
+            let lastTrack: string | null | undefined;
+            let rankInTrack = 0;
+            return results.map((team) => {
+              const score = team.score;
+              const showTrackHeader = hasTracks && team.track !== lastTrack;
+              if (showTrackHeader) rankInTrack = 0;
+              lastTrack = team.track;
+              rankInTrack++;
+              const colSpan = hasTracks ? 9 : 8;
 
-            return (
-              <TableRow key={team.id}>
-                <TableCell className="text-center">
-                  <span className={`inline-flex min-w-8 items-center justify-center rounded-lg px-2 py-1 text-xs font-medium ${
-                    idx === 0
-                      ? 'bg-yellow-100 text-yellow-900'
-                      : idx === 1
-                        ? 'bg-slate-100 text-slate-800'
-                        : idx === 2
-                          ? 'bg-orange-100 text-orange-900'
-                          : 'bg-muted/60 text-foreground'
-                  }`}>
-                    {idx + 1}
-                  </span>
-                </TableCell>
-                <TableCell className="text-sm font-medium">{team.name}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{team.project_name || '—'}</TableCell>
-                <TableCell className="text-center">
-                  {score !== null ? (
-                    <Badge
-                      variant="secondary"
-                      className={
-                        idx === 0
-                          ? 'bg-yellow-100 text-yellow-900'
-                          : idx === 1
-                            ? 'bg-slate-100 text-slate-800'
-                            : idx === 2
-                              ? 'bg-orange-100 text-orange-900'
-                              : 'bg-sky-100 text-sky-800'
-                      }
-                    >
-                      {score.toFixed(1)} / 5
-                    </Badge>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">N/A</span>
+              return (
+                <>{showTrackHeader && (
+                  <TableRow key={`track-${team.track || 'none'}`} className="bg-muted/60 border-t-2">
+                    <TableCell colSpan={colSpan} className="py-2 font-semibold text-sm">
+                      {team.track || 'No Track'}
+                    </TableCell>
+                  </TableRow>
+                )}
+                <TableRow key={team.id}>
+                  <TableCell className="text-center">
+                    <span className={`inline-flex min-w-8 items-center justify-center rounded-lg px-2 py-1 text-xs font-medium ${
+                      rankInTrack === 1
+                        ? 'bg-yellow-100 text-yellow-900'
+                        : rankInTrack === 2
+                          ? 'bg-slate-100 text-slate-800'
+                          : rankInTrack === 3
+                            ? 'bg-orange-100 text-orange-900'
+                            : 'bg-muted/60 text-foreground'
+                    }`}>
+                      {rankInTrack}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">{team.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{team.project_name || '—'}</TableCell>
+                  {hasTracks && (
+                    <TableCell className="text-sm">
+                      {team.track ? <Badge variant="outline">{team.track}</Badge> : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
                   )}
-                </TableCell>
-                <TableCell className="text-center text-sm tabular-nums">{team.times_judged}</TableCell>
-                <TableCell className="text-center text-sm tabular-nums">{team.num_rankings}</TableCell>
-                <TableCell className="text-sm">{team.room_name}</TableCell>
-                <TableCell className="text-center text-sm tabular-nums">{team.floor}</TableCell>
-              </TableRow>
-            );
-          })}
+                  <TableCell className="text-center">
+                    {score !== null ? (
+                      <Badge
+                        variant="secondary"
+                        className={
+                          rankInTrack === 1
+                            ? 'bg-yellow-100 text-yellow-900'
+                            : rankInTrack === 2
+                              ? 'bg-slate-100 text-slate-800'
+                              : rankInTrack === 3
+                                ? 'bg-orange-100 text-orange-900'
+                                : 'bg-sky-100 text-sky-800'
+                        }
+                      >
+                        {score.toFixed(1)} / 5
+                      </Badge>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">N/A</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center text-sm tabular-nums">{team.times_judged}</TableCell>
+                  <TableCell className="text-center text-sm tabular-nums">{team.num_rankings}</TableCell>
+                  <TableCell className="text-sm">{team.room_name}</TableCell>
+                  <TableCell className="text-center text-sm tabular-nums">{team.floor}</TableCell>
+                </TableRow></>
+              );
+            });
+          })()}
         </TableBody>
       </Table>
     </div>

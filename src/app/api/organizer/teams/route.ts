@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       event_id: t.event_id,
       name: t.name,
       project_name: t.project_name || null,
+      track: t.track || null,
       team_number: t.team_number,
       room_id: t.room_id,
     })))

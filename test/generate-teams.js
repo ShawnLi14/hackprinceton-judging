@@ -36,7 +36,9 @@ const projectTypes = [
   'Virtual Tutor', 'Waste Sorter', 'Commute Optimizer', 'Mental Health App', 'Pet Finder',
 ];
 
-const lines = ['# Team Name, Project Name, Table Number, Room Name'];
+const tracks = ['Health', 'Education', 'Sustainability', 'Social Good', 'Finance'];
+
+const lines = ['# Team Name, Project Name, Track, Table Number, Room Name'];
 const usedNames = new Set();
 
 for (let i = 1; i <= 200; i++) {
@@ -50,12 +52,13 @@ for (let i = 1; i <= 200; i++) {
   usedNames.add(teamName);
 
   const project = projectTypes[Math.floor(Math.random() * projectTypes.length)];
+  const track = tracks[Math.floor(Math.random() * tracks.length)];
   // Distribute teams across rooms roughly evenly (~16-17 per room)
   const room = rooms[(i - 1) % rooms.length];
   const tableInRoom = Math.floor((i - 1) / rooms.length) + 1;
   const tableNumber = `T${tableInRoom}`;
 
-  lines.push(`${teamName}, ${project}, ${tableNumber}, ${room}`);
+  lines.push(`${teamName}, ${project}, ${track}, ${tableNumber}, ${room}`);
 }
 
 const fs = require('fs');

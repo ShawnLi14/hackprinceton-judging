@@ -6,7 +6,9 @@ import { supabase } from '@/lib/supabase';
 // Body: { event_id, type: 'rooms' | 'teams' | 'judges', data: string }
 // Data format (one per line, comma-separated):
 //   rooms:  name, room_number, floor
-//   teams:  team_name, project_name, team_number, room_name
+//   teams:  team_name, project_name, track, team_number, room_name   (5 fields)
+//       or: team_name, project_name, team_number, room_name          (4 fields, no track)
+//       or: team_name, team_number, room_name                        (3 fields, minimal)
 //   judges: name, access_code
 export async function POST(req: NextRequest) {
   const { event_id, type, data } = await req.json();
@@ -64,13 +66,17 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        let name: string, project_name: string | null, team_number: string, room_name: string;
+        let name: string, project_name: string | null, track: string | null, team_number: string, room_name: string;
 
         if (parts.length === 3) {
           [name, team_number, room_name] = parts;
           project_name = null;
-        } else {
+          track = null;
+        } else if (parts.length === 4) {
           [name, project_name, team_number, room_name] = parts;
+          track = null;
+        } else {
+          [name, project_name, track, team_number, room_name] = parts;
         }
 
         const room_id = roomMap.get(room_name.toLowerCase());
@@ -83,6 +89,7 @@ export async function POST(req: NextRequest) {
           event_id,
           name,
           project_name: project_name || null,
+          track: track || null,
           team_number,
           room_id,
         });

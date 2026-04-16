@@ -1,37 +1,37 @@
-# Team Name, Project Name, Team Number, Room Name
+# Team Name, Project Name, Track, Team Number, Room Name
 # Floor 1 - Friend 101 (5 teams)
-Arc Pioneers, Skill Swap, 1, Friend 101
-Flux Phoenix, Transit App, 2, Friend 101
-Neon Hackers, Reading List, 3, Friend 101
-Stellar Force, Smart Calendar, 4, Friend 101
-Zen Grid, Meal Prep, 5, Friend 101
+Arc Pioneers, Skill Swap, Education, 1, Friend 101
+Flux Phoenix, Transit App, Sustainability, 2, Friend 101
+Neon Hackers, Reading List, Education, 3, Friend 101
+Stellar Force, Smart Calendar, Finance, 4, Friend 101
+Zen Grid, Meal Prep, Health, 5, Friend 101
 # Floor 1 - Friend 103 (5 teams)
-Apex Makers, Lost & Found, 6, Friend 103
-Delta Pioneers, Food Finder, 7, Friend 103
-Neural Team, Parking Finder, 8, Friend 103
-Cosmic Force, Eco Monitor, 9, Friend 103
-Neon Grid, Skill Swap, 10, Friend 103
+Apex Makers, Lost & Found, Social Good, 6, Friend 103
+Delta Pioneers, Food Finder, Health, 7, Friend 103
+Neural Team, Parking Finder, Sustainability, 8, Friend 103
+Cosmic Force, Eco Monitor, Sustainability, 9, Friend 103
+Neon Grid, Skill Swap, Education, 10, Friend 103
 # Floor 2 - Friend 201 (5 teams)
-Ember Team, AI Assistant, 11, Friend 201
-Zen Dynamics, Parking Finder, 12, Friend 201
-Apex Force, AR Navigator, 13, Friend 201
-Neural Force, Chat Platform, 14, Friend 201
-Alpha Creators, Mental Health App, 15, Friend 201
+Ember Team, AI Assistant, Health, 11, Friend 201
+Zen Dynamics, Parking Finder, Sustainability, 12, Friend 201
+Apex Force, AR Navigator, Education, 13, Friend 201
+Neural Force, Chat Platform, Social Good, 14, Friend 201
+Alpha Creators, Mental Health App, Health, 15, Friend 201
 # Floor 2 - Friend 203 (5 teams)
-Fusion Innovators, Carbon Calculator, 16, Friend 203
-Digital Node, Study Buddy, 17, Friend 203
-Solar Systems, Habit Builder, 18, Friend 203
-Quantum Matrix, Recipe AI, 19, Friend 203
-Neural Core, Commute Optimizer, 20, Friend 203
+Fusion Innovators, Carbon Calculator, Sustainability, 16, Friend 203
+Digital Node, Study Buddy, Education, 17, Friend 203
+Solar Systems, Habit Builder, Health, 18, Friend 203
+Quantum Matrix, Recipe AI, Health, 19, Friend 203
+Neural Core, Commute Optimizer, Sustainability, 20, Friend 203
 # Floor 3 - Sherrerd 301 (5 teams)
-Pixel Builders, AR Navigator, 21, Sherrerd 301
-Ember Hackers, Volunteer Hub, 22, Sherrerd 301
-Astro Builders, Parking Finder, 23, Sherrerd 301
-Nova Builders, Reading List, 24, Sherrerd 301
-Digital Coders, AI Assistant, 25, Sherrerd 301
+Pixel Builders, AR Navigator, Education, 21, Sherrerd 301
+Ember Hackers, Volunteer Hub, Social Good, 22, Sherrerd 301
+Astro Builders, Parking Finder, Sustainability, 23, Sherrerd 301
+Nova Builders, Reading List, Education, 24, Sherrerd 301
+Digital Coders, AI Assistant, Health, 25, Sherrerd 301
 # Floor 3 - Sherrerd 303 (5 teams)
-Drift Coders, Donation Platform, 26, Sherrerd 303
-Ultra Devs, Virtual Tutor, 27, Sherrerd 303
-Vibe Systems, Music Generator, 28, Sherrerd 303
-Apex Collective, Language Tutor, 29, Sherrerd 303
-Sonic Works, Carbon Calculator, 30, Sherrerd 303
+Drift Coders, Donation Platform, Social Good, 26, Sherrerd 303
+Ultra Devs, Virtual Tutor, Education, 27, Sherrerd 303
+Vibe Systems, Music Generator, Finance, 28, Sherrerd 303
+Apex Collective, Language Tutor, Education, 29, Sherrerd 303
+Sonic Works, Carbon Calculator, Sustainability, 30, Sherrerd 303

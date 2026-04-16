@@ -13,6 +13,17 @@ export default function Home() {
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sitePassword, setSitePassword] = useState('');
+  const [passwordVerified, setPasswordVerified] = useState(false);
+
+  const requirePassword = (): string | null => {
+    if (passwordVerified) return sitePassword;
+    const pw = prompt('Enter site password:');
+    if (!pw) return null;
+    setSitePassword(pw);
+    setPasswordVerified(true);
+    return pw;
+  };
 
   const loadEvents = useCallback(() => {
     fetch('/api/events')
@@ -30,8 +41,16 @@ export default function Home() {
   }, [loadEvents]);
 
   const deleteEvent = async (id: string) => {
+    const pw = requirePassword();
+    if (!pw) return;
     if (!confirm('Delete this event and ALL its data (teams, judges, sets)? This cannot be undone.')) return;
-    await fetch(`/api/events?id=${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/events?id=${id}&password=${encodeURIComponent(pw)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error || 'Delete failed');
+      setPasswordVerified(false);
+      return;
+    }
     loadEvents();
   };
 
@@ -77,7 +96,11 @@ export default function Home() {
                       variant="outline"
                       className="h-11 min-w-[180px] justify-between rounded-md pl-5 pr-4"
                       data-icon="inline-end"
-                      onClick={() => router.push(`/organizer/setup?event=${event.id}`)}
+                      onClick={() => {
+                        const pw = requirePassword();
+                        if (!pw) return;
+                        router.push(`/organizer/setup?event=${event.id}`);
+                      }}
                     >
                       Join as organizer
                       <ArrowRight className="size-4" aria-hidden="true" />
@@ -99,7 +122,11 @@ export default function Home() {
         <section className="space-y-6">
           <h1 className="text-base font-semibold tracking-[-0.02em] text-balance">Create event</h1>
           <div className="rounded-md bg-card px-4 py-4 shadow-soft">
-            <CreateEventForm onCreated={loadEvents} />
+            <CreateEventForm
+              requirePassword={requirePassword}
+              onCreated={loadEvents}
+              onAuthError={() => setPasswordVerified(false)}
+            />
           </div>
         </section>
       </div>
@@ -107,21 +134,32 @@ export default function Home() {
   );
 }
 
-function CreateEventForm({ onCreated }: { onCreated: () => void }) {
+function CreateEventForm({ onCreated, requirePassword, onAuthError }: {
+  onCreated: () => void;
+  requirePassword: () => string | null;
+  onAuthError: () => void;
+}) {
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
 
   const handleCreate = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!name.trim()) return;
-
+    const pw = requirePassword();
+    if (!pw) return;
     setCreating(true);
     try {
-      await fetch('/api/events', {
+      const res = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, password: pw }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Create failed');
+        onAuthError();
+        return;
+      }
       setName('');
       onCreated();
     } finally {

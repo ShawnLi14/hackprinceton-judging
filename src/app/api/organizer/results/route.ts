@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
       id: team.id,
       name: team.name,
       project_name: team.project_name,
+      track: team.track || null,
       team_number: team.team_number,
       room_name: team.room?.name || 'Unknown',
       floor: team.room?.floor || 0,
@@ -56,8 +57,15 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Sort by average score descending (best first)
+  // Sort by track (alphabetical, nulls last) then by score descending
   results.sort((a, b) => {
+    const trackA = a.track || '';
+    const trackB = b.track || '';
+    if (trackA !== trackB) {
+      if (!trackA) return 1;
+      if (!trackB) return -1;
+      return trackA.localeCompare(trackB);
+    }
     if (a.score === null && b.score === null) return 0;
     if (a.score === null) return 1;
     if (b.score === null) return -1;

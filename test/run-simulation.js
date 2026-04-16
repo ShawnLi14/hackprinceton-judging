@@ -1,52 +1,228 @@
 /**
- * HackPrinceton Judging Simulation
- * 
- * This script:
- * 1. Creates a test event
- * 2. Imports rooms, teams, and judges from text files
- * 3. Starts the event
- * 4. Spawns judge bots that simulate the full judging flow
- * 5. Validates correctness throughout:
- *    - No team is judged by two judges simultaneously
- *    - All teams get judged roughly equally
- *    - No errors in the flow
- *    - Rankings are properly recorded
- * 
+ * HackPrinceton Judging — Multi-Scenario Simulation
+ *
+ * Runs a matrix of scenarios with different team counts, room layouts,
+ * judge counts, and set sizes to stress-test the judging system.
+ *
+ * Each scenario creates a fresh event, imports generated data, runs
+ * judge bots, and validates correctness:
+ *   - No team is judged by two judges simultaneously
+ *   - All teams get judged roughly equally
+ *   - No errors in the flow
+ *   - Rankings are properly recorded
+ *
  * Usage: node test/run-simulation.js [BASE_URL]
  *   Default BASE_URL: http://localhost:3000
  */
 
-const fs = require('fs');
-const path = require('path');
-
 const BASE_URL = process.argv[2] || 'http://localhost:3000';
-const DATA_DIR = path.join(__dirname, 'data');
 
 // ============================================
-// Tracking & Validation
+// Scenarios
 // ============================================
-const stats = {
-  totalSetsAssigned: 0,
-  totalSetsCompleted: 0,
-  totalErrors: 0,
-  assignmentErrors: [],
-  submissionErrors: [],
-  concurrencyViolations: [],     // teams judged by 2+ judges at once
-  teamJudgeCounts: {},           // team_id -> count
-  judgeSetCounts: {},            // judge_name -> count
-  activeTeamLocks: new Map(),    // team_id -> judge_name (currently being judged)
-  startTime: null,
-  endTime: null,
-};
+const SCENARIOS = [
+  {
+    name: 'Tiny — single room',
+    teams: 5,
+    rooms: [{ name: 'Room A', number: '101', floor: 1 }],
+    judges: 3,
+    set_size: 3,
+    target_judgings: 2,
+    max_sets_per_judge: 4,
+  },
+  {
+    name: 'Small — fewer teams than judges',
+    teams: 8,
+    rooms: [
+      { name: 'Room A', number: '101', floor: 1 },
+      { name: 'Room B', number: '102', floor: 1 },
+    ],
+    judges: 12,
+    set_size: 4,
+    target_judgings: 3,
+    max_sets_per_judge: 4,
+  },
+  {
+    name: 'Medium — balanced',
+    teams: 50,
+    rooms: [
+      { name: 'Friend 101', number: '101', floor: 1 },
+      { name: 'Friend 103', number: '103', floor: 1 },
+      { name: 'Friend 201', number: '201', floor: 2 },
+      { name: 'Friend 203', number: '203', floor: 2 },
+      { name: 'Sherrerd 301', number: '301', floor: 3 },
+      { name: 'Sherrerd 303', number: '303', floor: 3 },
+    ],
+    judges: 10,
+    set_size: 5,
+    target_judgings: 3,
+    max_sets_per_judge: 8,
+  },
+  {
+    name: 'Medium — many rooms, sparse teams',
+    teams: 30,
+    rooms: [
+      { name: 'Room A', number: '101', floor: 1 },
+      { name: 'Room B', number: '102', floor: 1 },
+      { name: 'Room C', number: '103', floor: 1 },
+      { name: 'Room D', number: '201', floor: 2 },
+      { name: 'Room E', number: '202', floor: 2 },
+      { name: 'Room F', number: '203', floor: 2 },
+      { name: 'Room G', number: '301', floor: 3 },
+      { name: 'Room H', number: '302', floor: 3 },
+      { name: 'Room I', number: '303', floor: 3 },
+      { name: 'Room J', number: '304', floor: 3 },
+    ],
+    judges: 8,
+    set_size: 5,
+    target_judgings: 3,
+    max_sets_per_judge: 8,
+  },
+  {
+    name: 'Medium — small sets',
+    teams: 40,
+    rooms: [
+      { name: 'Lab 1', number: '101', floor: 1 },
+      { name: 'Lab 2', number: '102', floor: 1 },
+      { name: 'Lab 3', number: '201', floor: 2 },
+    ],
+    judges: 15,
+    set_size: 3,
+    target_judgings: 3,
+    max_sets_per_judge: 10,
+  },
+  {
+    name: 'Large — full hackathon',
+    teams: 200,
+    rooms: [
+      { name: 'Friend 101', number: '101', floor: 1 },
+      { name: 'Friend 103', number: '103', floor: 1 },
+      { name: 'Friend 105', number: '105', floor: 1 },
+      { name: 'Friend 108', number: '108', floor: 1 },
+      { name: 'Friend 110', number: '110', floor: 1 },
+      { name: 'Friend 201', number: '201', floor: 2 },
+      { name: 'Friend 203', number: '203', floor: 2 },
+      { name: 'Friend 205', number: '205', floor: 2 },
+      { name: 'Friend 206', number: '206', floor: 2 },
+      { name: 'Sherrerd 301', number: '301', floor: 3 },
+      { name: 'Sherrerd 303', number: '303', floor: 3 },
+      { name: 'Sherrerd 305', number: '305', floor: 3 },
+    ],
+    judges: 20,
+    set_size: 5,
+    target_judgings: 3,
+    max_sets_per_judge: 8,
+  },
+  {
+    name: 'Edge — teams equal to set size',
+    teams: 5,
+    rooms: [{ name: 'Room A', number: '101', floor: 1 }],
+    judges: 3,
+    set_size: 5,
+    target_judgings: 3,
+    max_sets_per_judge: 4,
+  },
+  {
+    name: 'Edge — large sets',
+    teams: 60,
+    rooms: [
+      { name: 'Hall A', number: '101', floor: 1 },
+      { name: 'Hall B', number: '102', floor: 1 },
+      { name: 'Hall C', number: '201', floor: 2 },
+      { name: 'Hall D', number: '202', floor: 2 },
+    ],
+    judges: 6,
+    set_size: 8,
+    target_judgings: 2,
+    max_sets_per_judge: 6,
+  },
+];
 
-function log(msg, level = 'INFO') {
-  const timestamp = new Date().toISOString().slice(11, 23);
-  const prefix = level === 'ERROR' ? '❌' : level === 'WARN' ? '⚠️' : level === 'OK' ? '✅' : '📋';
-  console.log(`[${timestamp}] ${prefix} ${msg}`);
+// ============================================
+// Data Generation
+// ============================================
+const ADJECTIVES = [
+  'Quantum', 'Neural', 'Cyber', 'Digital', 'Pixel', 'Cloud', 'Hyper', 'Nano',
+  'Solar', 'Astro', 'Turbo', 'Mega', 'Ultra', 'Sonic', 'Fusion', 'Alpha',
+  'Beta', 'Gamma', 'Delta', 'Omega', 'Zen', 'Nova', 'Apex', 'Echo',
+  'Blaze', 'Storm', 'Swift', 'Spark', 'Flux', 'Vibe', 'Neon', 'Pulse',
+];
+const NOUNS = [
+  'Hackers', 'Coders', 'Builders', 'Makers', 'Creators', 'Devs', 'Squad',
+  'Labs', 'Works', 'Forge', 'Studio', 'Dynamics', 'Systems', 'Collective',
+  'Alliance', 'Brigade', 'Crew', 'Team', 'Force', 'Unit', 'Hub', 'Node',
+];
+const PROJECTS = [
+  'AI Assistant', 'Health Tracker', 'Study Buddy', 'Food Finder', 'Transit App',
+  'Budget Planner', 'Eco Monitor', 'Music Generator', 'AR Navigator', 'Chat Platform',
+];
+const TRACKS = ['Health', 'Education', 'Sustainability', 'Social Good', 'Finance'];
+const JUDGE_FIRST = [
+  'Alice', 'Bob', 'Carol', 'David', 'Emma', 'Frank', 'Grace', 'Henry',
+  'Iris', 'James', 'Karen', 'Larry', 'Maria', 'Nathan', 'Olivia', 'Pat',
+  'Quinn', 'Rachel', 'Steven', 'Tracy', 'Uma', 'Victor', 'Wendy', 'Xavier',
+  'Yuki', 'Zara',
+];
+const JUDGE_LAST = [
+  'Chen', 'Martinez', 'Williams', 'Kim', 'Johnson', 'Liu', 'Patel', 'Wilson',
+  'Thompson', 'Garcia', 'Lee', 'Brown', 'Rodriguez', 'Davis', 'Moore', 'Taylor',
+  'Anderson', 'Thomas', 'White', 'Harris', 'Clark', 'Lewis', 'Hall', 'Young',
+  'King', 'Wright',
+];
+
+function generateRoomsText(rooms) {
+  const lines = ['# Room Name, Room Number, Floor'];
+  for (const r of rooms) {
+    lines.push(`${r.name}, ${r.number}, ${r.floor}`);
+  }
+  return lines.join('\n') + '\n';
 }
 
-function logError(msg) { log(msg, 'ERROR'); stats.totalErrors++; }
-function logOk(msg) { log(msg, 'OK'); }
+function generateTeamsText(count, rooms) {
+  const lines = ['# Team Name, Project Name, Track, Team Number, Room Name'];
+  const usedNames = new Set();
+  for (let i = 1; i <= count; i++) {
+    let name;
+    do {
+      const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+      const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+      name = `${adj} ${noun}`;
+    } while (usedNames.has(name));
+    usedNames.add(name);
+
+    const project = PROJECTS[Math.floor(Math.random() * PROJECTS.length)];
+    const track = TRACKS[Math.floor(Math.random() * TRACKS.length)];
+    const room = rooms[(i - 1) % rooms.length];
+    lines.push(`${name}, ${project}, ${track}, ${i}, ${room.name}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+function generateJudgesText(count) {
+  const lines = ['# Judge Name, Access Code'];
+  const usedNames = new Set();
+  for (let i = 1; i <= count; i++) {
+    let name;
+    do {
+      const first = JUDGE_FIRST[Math.floor(Math.random() * JUDGE_FIRST.length)];
+      const last = JUDGE_LAST[Math.floor(Math.random() * JUDGE_LAST.length)];
+      name = `${first} ${last}`;
+    } while (usedNames.has(name));
+    usedNames.add(name);
+
+    lines.push(`${name}, JUDGE-${String(i).padStart(3, '0')}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+// ============================================
+// Logging
+// ============================================
+function log(msg, level = 'INFO') {
+  const timestamp = new Date().toISOString().slice(11, 23);
+  const prefix = level === 'ERROR' ? '!!!' : level === 'WARN' ? '???' : level === 'OK' ? '>>>' : '---';
+  console.log(`[${timestamp}] ${prefix} ${msg}`);
+}
 
 // ============================================
 // HTTP Helpers
@@ -68,66 +244,23 @@ async function apiPost(endpoint, body) {
   return api(endpoint, { method: 'POST', body: JSON.stringify(body) });
 }
 
-// ============================================
-// Setup: Create event & import data
-// ============================================
-async function setupEvent() {
-  log('Creating test event...');
-  const event = await apiPost('/api/events', {
-    name: `Simulation Test ${new Date().toLocaleTimeString()}`,
-    set_size: 5,
-    target_judgings_per_team: 3,
-    max_judging_minutes: 30,
-    admin_code: 'TEST-ADMIN',
-  });
-  log(`Event created: ${event.name} (${event.id})`);
-  return event;
-}
-
-async function importData(eventId) {
-  const roomsData = fs.readFileSync(path.join(DATA_DIR, 'rooms.txt'), 'utf-8');
-  log('Importing rooms...');
-  const roomsResult = await apiPost('/api/import', { event_id: eventId, type: 'rooms', data: roomsData });
-  log(`Imported ${roomsResult.imported} rooms`);
-
-  const teamsData = fs.readFileSync(path.join(DATA_DIR, 'teams.txt'), 'utf-8');
-  log('Importing teams...');
-  const teamsResult = await apiPost('/api/import', { event_id: eventId, type: 'teams', data: teamsData });
-  log(`Imported ${teamsResult.imported} teams`);
-  if (teamsResult.errors?.length > 0) {
-    teamsResult.errors.forEach(e => logError(`Team import: ${e}`));
-  }
-
-  const judgesData = fs.readFileSync(path.join(DATA_DIR, 'judges.txt'), 'utf-8');
-  log('Importing judges...');
-  const judgesResult = await apiPost('/api/import', { event_id: eventId, type: 'judges', data: judgesData });
-  log(`Imported ${judgesResult.imported} judges`);
-
-  return { rooms: roomsResult, teams: teamsResult, judges: judgesResult };
-}
-
-async function startEvent(eventId) {
-  log('Starting event...');
-  await apiPost('/api/organizer/start', { event_id: eventId, action: 'start' });
-  logOk('Event started');
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ============================================
 // Judge Bot
 // ============================================
 class JudgeBot {
-  constructor(name, accessCode, eventId, botId) {
+  constructor(name, accessCode, eventId, botId, stats) {
     this.name = name;
     this.accessCode = accessCode;
     this.eventId = eventId;
     this.botId = botId;
+    this.stats = stats;
     this.judgeId = null;
     this.setsCompleted = 0;
     this.running = true;
-  }
-
-  log(msg, level = 'INFO') {
-    log(`[Bot ${this.botId} - ${this.name}] ${msg}`, level);
   }
 
   async login() {
@@ -137,11 +270,10 @@ class JudgeBot {
         event_id: this.eventId,
       });
       this.judgeId = result.judge.id;
-      this.log(`Logged in (id: ${this.judgeId.slice(0, 8)}...)`);
       return true;
     } catch (e) {
-      this.log(`Login failed: ${e.message}`, 'ERROR');
-      stats.totalErrors++;
+      log(`[${this.name}] Login failed: ${e.message}`, 'ERROR');
+      this.stats.totalErrors++;
       return false;
     }
   }
@@ -153,79 +285,62 @@ class JudgeBot {
         event_id: this.eventId,
       });
 
-      if (!result.set) {
-        this.log('No set returned (may be no available teams)', 'WARN');
-        return null;
-      }
+      if (!result.set) return null;
 
-      stats.totalSetsAssigned++;
+      this.stats.totalSetsAssigned++;
       const set = result.set;
-      const teamNames = set.judging_set_teams
-        ?.map(st => st.team?.name || st.team_id.slice(0, 8))
-        .join(', ');
 
-      this.log(`Assigned set ${set.id.slice(0, 8)}... with ${set.judging_set_teams?.length || 0} teams: [${teamNames}]`);
-
-      // Concurrency check: verify no team in this set is already being judged
       for (const st of set.judging_set_teams || []) {
-        const existingJudge = stats.activeTeamLocks.get(st.team_id);
+        const existingJudge = this.stats.activeTeamLocks.get(st.team_id);
         if (existingJudge) {
           const violation = `Team ${st.team?.name || st.team_id} assigned to BOTH ${existingJudge} AND ${this.name}`;
-          this.log(violation, 'ERROR');
-          stats.concurrencyViolations.push(violation);
+          log(violation, 'ERROR');
+          this.stats.concurrencyViolations.push(violation);
         }
-        stats.activeTeamLocks.set(st.team_id, this.name);
+        this.stats.activeTeamLocks.set(st.team_id, this.name);
       }
 
       return set;
     } catch (e) {
-      if (e.message.includes('404')) {
-        this.log('No teams available for assignment');
-        return null;
-      }
-      this.log(`Assignment failed: ${e.message}`, 'ERROR');
-      stats.assignmentErrors.push(`${this.name}: ${e.message}`);
+      if (e.message.includes('404')) return null;
+      this.stats.assignmentErrors.push(`${this.name}: ${e.message}`);
       return null;
     }
   }
 
   async visitTeams(set) {
     const teams = (set.judging_set_teams || []).sort((a, b) => a.visit_order - b.visit_order);
-
     for (const st of teams) {
-      await sleep(200 + Math.random() * 300);
-
+      await sleep(100 + Math.random() * 200);
       try {
         await apiPost('/api/judges/visit', {
           judging_set_id: set.id,
           team_id: st.team_id,
         });
       } catch (e) {
-        this.log(`Visit failed for team ${st.team_id}: ${e.message}`, 'ERROR');
-        stats.totalErrors++;
+        log(`[${this.name}] Visit failed: ${e.message}`, 'ERROR');
+        this.stats.totalErrors++;
       }
     }
   }
 
   async submitRankings(set) {
     const teams = (set.judging_set_teams || []).filter(st => !st.is_absent);
-
     const shuffled = [...teams].sort(() => Math.random() - 0.5);
+    const maxRank = Math.min(shuffled.length, 5);
     const rankings = set.judging_set_teams.map(st => {
       const rankIdx = shuffled.findIndex(s => s.team_id === st.team_id);
+      const rank = rankIdx >= 0 ? Math.min(rankIdx + 1, maxRank) : maxRank;
       return {
         team_id: st.team_id,
-        rank: rankIdx >= 0 ? rankIdx + 1 : teams.length,
+        rank,
         notes: `Bot ${this.botId} auto-ranking`,
         is_absent: false,
       };
     });
 
-    // Release local tracking BEFORE calling submit API.
-    // The DB releases locks atomically during the submit RPC,
-    // so clearing here prevents false-positive concurrency violations.
     for (const st of set.judging_set_teams || []) {
-      stats.activeTeamLocks.delete(st.team_id);
+      this.stats.activeTeamLocks.delete(st.team_id);
     }
 
     try {
@@ -233,199 +348,238 @@ class JudgeBot {
         judging_set_id: set.id,
         rankings,
       });
-
-      stats.totalSetsCompleted++;
+      this.stats.totalSetsCompleted++;
       this.setsCompleted++;
-
       for (const st of set.judging_set_teams || []) {
-        stats.teamJudgeCounts[st.team_id] = (stats.teamJudgeCounts[st.team_id] || 0) + 1;
+        this.stats.teamJudgeCounts[st.team_id] = (this.stats.teamJudgeCounts[st.team_id] || 0) + 1;
       }
-
-      this.log(`Submitted rankings for set ${set.id.slice(0, 8)}... (total: ${this.setsCompleted} sets)`);
       return true;
     } catch (e) {
-      this.log(`Submit failed: ${e.message}`, 'ERROR');
-      stats.submissionErrors.push(`${this.name}: ${e.message}`);
+      log(`[${this.name}] Submit failed: ${e.message}`, 'ERROR');
+      this.stats.submissionErrors.push(`${this.name}: ${e.message}`);
       return false;
     }
   }
 
-  async run(maxSets = 10) {
+  async run(maxSets) {
     const loggedIn = await this.login();
     if (!loggedIn) return;
 
-    await sleep(Math.random() * 1000);
-
+    await sleep(Math.random() * 500);
     let consecutiveFailures = 0;
 
     while (this.running && this.setsCompleted < maxSets) {
       const set = await this.requestSet();
-
       if (!set) {
         consecutiveFailures++;
-        if (consecutiveFailures >= 5) {
-          this.log('5 consecutive failures to get a set, stopping');
-          break;
-        }
-        await sleep(1000 + Math.random() * 2000);
+        if (consecutiveFailures >= 5) break;
+        await sleep(500 + Math.random() * 1000);
         continue;
       }
-
       consecutiveFailures = 0;
-
       await this.visitTeams(set);
-      await sleep(100 + Math.random() * 200);
+      await sleep(50 + Math.random() * 100);
       await this.submitRankings(set);
-      await sleep(300 + Math.random() * 500);
+      await sleep(100 + Math.random() * 200);
     }
 
-    stats.judgeSetCounts[this.name] = this.setsCompleted;
-    this.log(`Finished. ${this.setsCompleted} sets completed.`);
-  }
-
-  stop() {
-    this.running = false;
+    this.stats.judgeSetCounts[this.name] = this.setsCompleted;
   }
 }
 
 // ============================================
-// Validation & Reporting
+// Run a single scenario
 // ============================================
-async function validateResults(eventId) {
-  log('\n========================================');
-  log('VALIDATION & RESULTS');
-  log('========================================\n');
+function freshStats() {
+  return {
+    totalSetsAssigned: 0,
+    totalSetsCompleted: 0,
+    totalErrors: 0,
+    assignmentErrors: [],
+    submissionErrors: [],
+    concurrencyViolations: [],
+    teamJudgeCounts: {},
+    judgeSetCounts: {},
+    activeTeamLocks: new Map(),
+  };
+}
 
-  // Check results from the API
+async function runScenario(scenario) {
+  const stats = freshStats();
+  const tag = scenario.name;
+
+  log(`Creating event for: ${tag}`);
+  const event = await apiPost('/api/events', {
+    name: `Test: ${tag} — ${new Date().toLocaleTimeString()}`,
+    set_size: scenario.set_size,
+    target_judgings_per_team: scenario.target_judgings,
+    max_judging_minutes: 30,
+    admin_code: 'TEST-ADMIN',
+    password: 'hehe1414',
+  });
+
+  const roomsText = generateRoomsText(scenario.rooms);
+  const teamsText = generateTeamsText(scenario.teams, scenario.rooms);
+  const judgesText = generateJudgesText(scenario.judges);
+
+  const roomsResult = await apiPost('/api/import', { event_id: event.id, type: 'rooms', data: roomsText });
+  const teamsResult = await apiPost('/api/import', { event_id: event.id, type: 'teams', data: teamsText });
+  if (teamsResult.errors?.length > 0) {
+    teamsResult.errors.forEach(e => { log(`  Team import error: ${e}`, 'ERROR'); stats.totalErrors++; });
+  }
+  const judgesResult = await apiPost('/api/import', { event_id: event.id, type: 'judges', data: judgesText });
+
+  log(`  Imported ${roomsResult.imported} rooms, ${teamsResult.imported} teams, ${judgesResult.imported} judges`);
+
+  await apiPost('/api/organizer/start', { event_id: event.id, action: 'start' });
+
+  const judgeList = judgesResult.items;
+  const startTime = Date.now();
+
+  const bots = judgeList.map((j, i) =>
+    new JudgeBot(j.name, j.access_code, event.id, i + 1, stats)
+  );
+  await Promise.all(bots.map(bot => bot.run(scenario.max_sets_per_judge)));
+
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+  // Validate
   let results;
   try {
-    results = await api(`/api/organizer/results?event_id=${eventId}`);
+    results = await api(`/api/organizer/results?event_id=${event.id}`);
   } catch (e) {
-    logError(`Failed to fetch results: ${e.message}`);
-    return;
+    log(`  Failed to fetch results: ${e.message}`, 'ERROR');
+    stats.totalErrors++;
+    try { await apiPost('/api/organizer/start', { event_id: event.id, action: 'complete' }); } catch (_) {}
+    return { scenario: tag, passed: false, stats, duration };
   }
 
-  // Check team judging counts
   const judgeCounts = results.map(r => r.times_judged);
   const minJudged = Math.min(...judgeCounts);
   const maxJudged = Math.max(...judgeCounts);
   const avgJudged = (judgeCounts.reduce((a, b) => a + b, 0) / judgeCounts.length).toFixed(1);
   const unjudged = judgeCounts.filter(c => c === 0).length;
-
-  log(`Teams: ${results.length}`);
-  log(`Judging counts — min: ${minJudged}, max: ${maxJudged}, avg: ${avgJudged}`);
-  log(`Unjudged teams: ${unjudged}`);
-
-  // Check fairness
   const spread = maxJudged - minJudged;
-  if (spread <= 2) {
-    logOk(`Fairness: excellent (spread = ${spread})`);
-  } else if (spread <= 4) {
-    log(`Fairness: acceptable (spread = ${spread})`, 'WARN');
-  } else {
-    logError(`Fairness: poor (spread = ${spread}), some teams judged much more than others`);
+  const scored = results.filter(r => r.score !== null).length;
+
+  if (spread > 4) {
+    log(`  Fairness: poor (spread = ${spread})`, 'ERROR');
+    stats.totalErrors++;
   }
 
-  // Concurrency violations
-  if (stats.concurrencyViolations.length === 0) {
-    logOk('Concurrency: no double-judging detected');
-  } else {
-    logError(`Concurrency: ${stats.concurrencyViolations.length} violations detected!`);
-    stats.concurrencyViolations.slice(0, 10).forEach(v => logError(`  ${v}`));
-    if (stats.concurrencyViolations.length > 10) {
-      logError(`  ... and ${stats.concurrencyViolations.length - 10} more`);
-    }
-  }
+  // Complete event
+  try { await apiPost('/api/organizer/start', { event_id: event.id, action: 'complete' }); } catch (_) {}
 
-  // Check scores exist
-  const scored = results.filter(r => r.score !== null);
-  if (scored.length === results.length) {
-    logOk(`Scoring: all ${results.length} teams have scores`);
-  } else {
-    log(`Scoring: ${scored.length}/${results.length} teams have scores (${results.length - scored.length} missing)`, 'WARN');
-  }
+  const passed = stats.totalErrors === 0 && stats.concurrencyViolations.length === 0;
 
-  // Top 5
-  log('\nTop 5 teams:');
-  results.slice(0, 5).forEach((r, i) => {
-    log(`  #${i + 1}: ${r.name} — score: ${r.score?.toFixed(1) || 'N/A'}, judged: ${r.times_judged}x`);
-  });
-
-  // Judge workload
-  log('\nJudge workload:');
-  const judgeEntries = Object.entries(stats.judgeSetCounts).sort((a, b) => b[1] - a[1]);
-  for (const [name, count] of judgeEntries) {
-    log(`  ${name}: ${count} sets`);
-  }
-
-  // Summary
-  log('\n========================================');
-  log('SUMMARY');
-  log('========================================');
-  log(`Duration: ${((stats.endTime - stats.startTime) / 1000).toFixed(1)}s`);
-  log(`Sets assigned: ${stats.totalSetsAssigned}`);
-  log(`Sets completed: ${stats.totalSetsCompleted}`);
-  log(`Total errors: ${stats.totalErrors}`);
-  log(`Concurrency violations: ${stats.concurrencyViolations.length}`);
-  log(`Assignment errors: ${stats.assignmentErrors.length}`);
-  log(`Submission errors: ${stats.submissionErrors.length}`);
-
-  if (stats.totalErrors === 0 && stats.concurrencyViolations.length === 0) {
-    logOk('ALL TESTS PASSED ✓');
-  } else {
-    logError('SOME TESTS FAILED ✗');
-  }
+  return {
+    scenario: tag,
+    passed,
+    duration,
+    teams: scenario.teams,
+    rooms: scenario.rooms.length,
+    judges: scenario.judges,
+    set_size: scenario.set_size,
+    setsCompleted: stats.totalSetsCompleted,
+    minJudged,
+    maxJudged,
+    avgJudged,
+    spread,
+    unjudged,
+    scored,
+    totalTeams: results.length,
+    errors: stats.totalErrors,
+    concurrencyViolations: stats.concurrencyViolations.length,
+    assignmentErrors: stats.assignmentErrors.length,
+    submissionErrors: stats.submissionErrors.length,
+  };
 }
 
 // ============================================
 // Main
 // ============================================
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 async function main() {
-  log(`Starting simulation against ${BASE_URL}`);
-  log('========================================\n');
+  log('========================================================');
+  log('  HackPrinceton Judging — Multi-Scenario Simulation');
+  log(`  Target: ${BASE_URL}`);
+  log(`  Scenarios: ${SCENARIOS.length}`);
+  log('========================================================\n');
 
-  // 1. Setup
-  const event = await setupEvent();
-  const { judges } = await importData(event.id);
+  const results = [];
 
-  // 2. Start event
-  await startEvent(event.id);
+  for (let i = 0; i < SCENARIOS.length; i++) {
+    const scenario = SCENARIOS[i];
+    log(`\n[${ i + 1}/${SCENARIOS.length}] ${scenario.name}`);
+    log(`  Config: ${scenario.teams} teams, ${scenario.rooms.length} rooms, ${scenario.judges} judges, set_size=${scenario.set_size}, target=${scenario.target_judgings}`);
 
-  // 3. Create judge bots
-  const judgeList = judges.items;
-  const maxSetsPerJudge = 8;
+    try {
+      const result = await runScenario(scenario);
+      results.push(result);
 
-  log(`\nSpawning ${judgeList.length} judge bots (max ${maxSetsPerJudge} sets each)...\n`);
-
-  stats.startTime = Date.now();
-
-  const bots = judgeList.map((j, i) =>
-    new JudgeBot(j.name, j.access_code, event.id, i + 1)
-  );
-
-  // 4. Run all bots concurrently
-  await Promise.all(bots.map(bot => bot.run(maxSetsPerJudge)));
-
-  stats.endTime = Date.now();
-
-  // 5. Validate
-  await validateResults(event.id);
-
-  // Cleanup: complete the event
-  try {
-    await apiPost('/api/organizer/start', { event_id: event.id, action: 'complete' });
-    log('\nEvent marked as completed.');
-  } catch (e) {
-    log(`Failed to complete event: ${e.message}`, 'WARN');
+      const status = result.passed ? '>>> PASSED' : '!!! FAILED';
+      log(`  ${status} in ${result.duration}s — ${result.setsCompleted} sets, judged ${result.minJudged}-${result.maxJudged} (avg ${result.avgJudged}), spread=${result.spread}, errors=${result.errors}`,
+        result.passed ? 'OK' : 'ERROR');
+    } catch (e) {
+      log(`  Scenario crashed: ${e.message}`, 'ERROR');
+      results.push({ scenario: scenario.name, passed: false, duration: '?', error: e.message });
+    }
   }
+
+  // Final report
+  log('\n\n========================================================');
+  log('  FINAL REPORT');
+  log('========================================================\n');
+
+  const colW = { name: 36, teams: 6, rooms: 6, judges: 7, set: 4, sets: 5, judged: 12, spread: 7, time: 7, result: 8 };
+  const header =
+    'Scenario'.padEnd(colW.name) +
+    'Teams'.padStart(colW.teams) +
+    'Rooms'.padStart(colW.rooms) +
+    'Judges'.padStart(colW.judges) +
+    'Set'.padStart(colW.set) +
+    ' Sets'.padStart(colW.sets) +
+    '  Judged'.padStart(colW.judged) +
+    'Spread'.padStart(colW.spread) +
+    '  Time'.padStart(colW.time) +
+    '  Result'.padStart(colW.result);
+  log(header);
+  log('-'.repeat(header.length));
+
+  for (const r of results) {
+    if (r.error) {
+      log(`${r.scenario.padEnd(colW.name)}  CRASHED: ${r.error}`, 'ERROR');
+      continue;
+    }
+    const judgedRange = `${r.minJudged}-${r.maxJudged} (${r.avgJudged})`;
+    const line =
+      r.scenario.padEnd(colW.name) +
+      String(r.teams).padStart(colW.teams) +
+      String(r.rooms).padStart(colW.rooms) +
+      String(r.judges).padStart(colW.judges) +
+      String(r.set_size).padStart(colW.set) +
+      String(r.setsCompleted).padStart(colW.sets) +
+      judgedRange.padStart(colW.judged) +
+      String(r.spread).padStart(colW.spread) +
+      `${r.duration}s`.padStart(colW.time) +
+      (r.passed ? '  PASS' : '  FAIL').padStart(colW.result);
+    log(line, r.passed ? 'OK' : 'ERROR');
+  }
+
+  const passedCount = results.filter(r => r.passed).length;
+  const failedCount = results.length - passedCount;
+
+  log('');
+  if (failedCount === 0) {
+    log(`ALL ${passedCount} SCENARIOS PASSED`, 'OK');
+  } else {
+    log(`${failedCount}/${results.length} SCENARIOS FAILED`, 'ERROR');
+  }
+
+  process.exit(failedCount > 0 ? 1 : 0);
 }
 
 main().catch(e => {
-  logError(`Simulation crashed: ${e.message}`);
+  log(`Simulation crashed: ${e.message}`, 'ERROR');
   console.error(e);
   process.exit(1);
 });

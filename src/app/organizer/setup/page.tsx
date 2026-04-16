@@ -31,7 +31,7 @@ function SetupPageContent() {
 
   // Form states
   const [newRoom, setNewRoom] = useState({ name: '', room_number: '', floor: '1' });
-  const [newTeam, setNewTeam] = useState({ name: '', project_name: '', team_number: '', room_name: '' });
+  const [newTeam, setNewTeam] = useState({ name: '', project_name: '', track: '', team_number: '', room_name: '' });
   const [newJudge, setNewJudge] = useState({ name: '', access_code: '' });
   const [bulkRooms, setBulkRooms] = useState('');
   const [showBulkRoomImport, setShowBulkRoomImport] = useState(false);
@@ -123,11 +123,12 @@ function SetupPageContent() {
         event_id: eventId,
         name: newTeam.name,
         project_name: newTeam.project_name || null,
+        track: newTeam.track || null,
         team_number: newTeam.team_number,
         room_id,
       }),
     });
-    setNewTeam({ name: '', project_name: '', team_number: '', room_name: '' });
+    setNewTeam({ name: '', project_name: '', track: '', team_number: '', room_name: '' });
     loadData();
   };
 
@@ -143,12 +144,16 @@ function SetupPageContent() {
     const errors: string[] = [];
     const teamsToCreate = lines.map((line, i) => {
       const parts = line.split(',').map(p => p.trim());
-      let name: string, project_name: string | null, team_number: string, roomName: string;
+      let name: string, project_name: string | null, track: string | null, team_number: string, roomName: string;
       if (parts.length === 3) {
         [name, team_number, roomName] = parts;
         project_name = null;
-      } else if (parts.length >= 4) {
+        track = null;
+      } else if (parts.length === 4) {
         [name, project_name, team_number, roomName] = parts;
+        track = null;
+      } else if (parts.length >= 5) {
+        [name, project_name, track, team_number, roomName] = parts;
       } else {
         return null;
       }
@@ -157,7 +162,7 @@ function SetupPageContent() {
         errors.push(`Line ${i + 1}: room "${roomName}" not found`);
         return null;
       }
-      return { event_id: eventId, name, project_name, team_number, room_id };
+      return { event_id: eventId, name, project_name, track: track || null, team_number, room_id };
     }).filter(Boolean);
 
     if (errors.length > 0) {
@@ -417,11 +422,11 @@ function SetupPageContent() {
           <CardContent className="space-y-4">
             {showBulkImport ? (
               <div className="space-y-2">
-                <Label className="text-xs">CSV: name, project, team #, room name (one per line)</Label>
+                <Label className="text-xs">CSV: name, project, track, team #, room name (one per line; track is optional)</Label>
                 <Textarea
                   aria-label="Bulk team import"
                   className="min-h-[120px] font-mono text-sm"
-                  placeholder={`Team Alpha, AI Project, 1, ${rooms[0]?.name || 'Room A'}\nTeam Beta, Web App, 2, ${rooms[0]?.name || 'Room A'}`}
+                  placeholder={`Team Alpha, AI Project, Health, 1, ${rooms[0]?.name || 'Room A'}\nTeam Beta, Web App, Education, 2, ${rooms[0]?.name || 'Room A'}`}
                   value={bulkTeams}
                   onChange={e => setBulkTeams(e.target.value)}
                 />
@@ -441,6 +446,13 @@ function SetupPageContent() {
                   placeholder="Project Name (optional)"
                   value={newTeam.project_name}
                   onChange={e => setNewTeam(p => ({ ...p, project_name: e.target.value }))}
+                  className="text-sm"
+                />
+                <Input
+                  aria-label="Track"
+                  placeholder="Track (optional)"
+                  value={newTeam.track}
+                  onChange={e => setNewTeam(p => ({ ...p, track: e.target.value }))}
                   className="text-sm"
                 />
                 <div className="grid grid-cols-2 gap-2">
@@ -473,6 +485,7 @@ function SetupPageContent() {
                     <span className="font-medium truncate block">{team.name}</span>
                     <span className="text-xs text-muted-foreground">
                       {team.room?.name || '?'} · #{team.team_number}
+                      {team.track ? ` · ${team.track}` : ''}
                     </span>
                   </div>
                   <Button size="sm" variant="ghost" className="h-7 text-destructive" aria-label={`Delete team ${team.name}`} onClick={() => deleteTeam(team.id)}>×</Button>

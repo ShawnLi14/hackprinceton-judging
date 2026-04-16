@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+const SITE_PASSWORD = process.env.SITE_PASSWORD || 'hehe1414';
+
+function checkPassword(password: string | undefined) {
+  if (password !== SITE_PASSWORD) {
+    return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+  }
+  return null;
+}
+
 // GET: list events or get specific event
 export async function GET(req: NextRequest) {
   const eventId = req.nextUrl.searchParams.get('id');
@@ -27,6 +36,9 @@ export async function GET(req: NextRequest) {
 // POST: create a new event
 export async function POST(req: NextRequest) {
   const body = await req.json();
+
+  const denied = checkPassword(body.password);
+  if (denied) return denied;
 
   const { data, error } = await supabase
     .from('events')
@@ -75,7 +87,11 @@ export async function PATCH(req: NextRequest) {
 // DELETE: delete an event (cascades to all related data)
 export async function DELETE(req: NextRequest) {
   const eventId = req.nextUrl.searchParams.get('id');
+  const password = req.nextUrl.searchParams.get('password');
   if (!eventId) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+  const denied = checkPassword(password || undefined);
+  if (denied) return denied;
 
   const { error } = await supabase.from('events').delete().eq('id', eventId);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
