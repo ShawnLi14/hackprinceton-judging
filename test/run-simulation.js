@@ -13,6 +13,10 @@
  *
  * Usage: node test/run-simulation.js [BASE_URL]
  *   Default BASE_URL: http://localhost:3000
+ *
+ * Each scenario's event is deleted as soon as the scenario finishes (pass or
+ * fail). Set KEEP_EVENTS=1 to retain events for post-mortem inspection.
+ * Set SITE_PASSWORD=... if your /api/events password isn't 'hehe1414'.
  */
 
 const BASE_URL = process.argv[2] || 'http://localhost:3000';
@@ -224,6 +228,17 @@ async function apiPost(endpoint, body) {
   return api(endpoint, { method: 'POST', body: JSON.stringify(body) });
 }
 
+const SITE_PASSWORD = process.env.SITE_PASSWORD || 'hehe1414';
+
+async function deleteEvent(eventId) {
+  if (!eventId) return;
+  try {
+    await api(`/api/events?id=${eventId}&password=${encodeURIComponent(SITE_PASSWORD)}`, { method: 'DELETE' });
+  } catch (e) {
+    log(`  Cleanup: failed to delete event ${eventId}: ${e.message}`, 'WARN');
+  }
+}
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -387,92 +402,98 @@ function freshStats() {
 async function runScenario(scenario) {
   const stats = freshStats();
   const tag = scenario.name;
+  let event = null;
 
-  log(`Creating event for: ${tag}`);
-  const event = await apiPost('/api/events', {
-    name: `Test: ${tag} — ${new Date().toLocaleTimeString()}`,
-    set_size: scenario.set_size,
-    target_judgings_per_team: scenario.target_judgings,
-    max_judging_minutes: 30,
-    admin_code: 'TEST-ADMIN',
-    password: 'hehe1414',
-  });
-
-  const roomsText = generateRoomsText(scenario.rooms);
-  const teamsText = generateTeamsText(scenario.teams, scenario.rooms);
-  const judgesText = generateJudgesText(scenario.judges);
-
-  const roomsResult = await apiPost('/api/import', { event_id: event.id, type: 'rooms', data: roomsText });
-  const teamsResult = await apiPost('/api/import', { event_id: event.id, type: 'teams', data: teamsText });
-  if (teamsResult.errors?.length > 0) {
-    teamsResult.errors.forEach(e => { log(`  Team import error: ${e}`, 'ERROR'); stats.totalErrors++; });
-  }
-  const judgesResult = await apiPost('/api/import', { event_id: event.id, type: 'judges', data: judgesText });
-
-  log(`  Imported ${roomsResult.imported} rooms, ${teamsResult.imported} teams, ${judgesResult.imported} judges`);
-
-  await apiPost('/api/organizer/start', { event_id: event.id, action: 'start' });
-
-  const judgeList = judgesResult.items;
-  const startTime = Date.now();
-
-  const bots = judgeList.map((j, i) =>
-    new JudgeBot(j.name, j.access_code, event.id, i + 1, stats)
-  );
-  await Promise.all(bots.map(bot => bot.run(scenario.max_sets_per_judge)));
-
-  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-
-  // Validate
-  let results;
   try {
-    results = await api(`/api/organizer/results?event_id=${event.id}`);
-  } catch (e) {
-    log(`  Failed to fetch results: ${e.message}`, 'ERROR');
-    stats.totalErrors++;
+    log(`Creating event for: ${tag}`);
+    event = await apiPost('/api/events', {
+      name: `Test: ${tag} — ${new Date().toLocaleTimeString()}`,
+      set_size: scenario.set_size,
+      target_judgings_per_team: scenario.target_judgings,
+      max_judging_minutes: 30,
+      admin_code: 'TEST-ADMIN',
+      password: SITE_PASSWORD,
+    });
+
+    const roomsText = generateRoomsText(scenario.rooms);
+    const teamsText = generateTeamsText(scenario.teams, scenario.rooms);
+    const judgesText = generateJudgesText(scenario.judges);
+
+    const roomsResult = await apiPost('/api/import', { event_id: event.id, type: 'rooms', data: roomsText });
+    const teamsResult = await apiPost('/api/import', { event_id: event.id, type: 'teams', data: teamsText });
+    if (teamsResult.errors?.length > 0) {
+      teamsResult.errors.forEach(e => { log(`  Team import error: ${e}`, 'ERROR'); stats.totalErrors++; });
+    }
+    const judgesResult = await apiPost('/api/import', { event_id: event.id, type: 'judges', data: judgesText });
+
+    log(`  Imported ${roomsResult.imported} rooms, ${teamsResult.imported} teams, ${judgesResult.imported} judges`);
+
+    await apiPost('/api/organizer/start', { event_id: event.id, action: 'start' });
+
+    const judgeList = judgesResult.items;
+    const startTime = Date.now();
+
+    const bots = judgeList.map((j, i) =>
+      new JudgeBot(j.name, j.access_code, event.id, i + 1, stats)
+    );
+    await Promise.all(bots.map(bot => bot.run(scenario.max_sets_per_judge)));
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    // Validate
+    let results;
+    try {
+      results = await api(`/api/organizer/results?event_id=${event.id}`);
+    } catch (e) {
+      log(`  Failed to fetch results: ${e.message}`, 'ERROR');
+      stats.totalErrors++;
+      try { await apiPost('/api/organizer/start', { event_id: event.id, action: 'complete' }); } catch (_) {}
+      return { scenario: tag, passed: false, stats, duration };
+    }
+
+    const judgeCounts = results.map(r => r.times_judged);
+    const minJudged = Math.min(...judgeCounts);
+    const maxJudged = Math.max(...judgeCounts);
+    const avgJudged = (judgeCounts.reduce((a, b) => a + b, 0) / judgeCounts.length).toFixed(1);
+    const unjudged = judgeCounts.filter(c => c === 0).length;
+    const spread = maxJudged - minJudged;
+    const scored = results.filter(r => r.score !== null).length;
+
+    if (spread > 4) {
+      log(`  Fairness: poor (spread = ${spread})`, 'ERROR');
+      stats.totalErrors++;
+    }
+
     try { await apiPost('/api/organizer/start', { event_id: event.id, action: 'complete' }); } catch (_) {}
-    return { scenario: tag, passed: false, stats, duration };
+
+    const passed = stats.totalErrors === 0 && stats.concurrencyViolations.length === 0;
+
+    return {
+      scenario: tag,
+      passed,
+      duration,
+      teams: scenario.teams,
+      rooms: scenario.rooms.length,
+      judges: scenario.judges,
+      set_size: scenario.set_size,
+      setsCompleted: stats.totalSetsCompleted,
+      minJudged,
+      maxJudged,
+      avgJudged,
+      spread,
+      unjudged,
+      scored,
+      totalTeams: results.length,
+      errors: stats.totalErrors,
+      concurrencyViolations: stats.concurrencyViolations.length,
+      assignmentErrors: stats.assignmentErrors.length,
+      submissionErrors: stats.submissionErrors.length,
+    };
+  } finally {
+    if (event?.id && !process.env.KEEP_EVENTS) {
+      await deleteEvent(event.id);
+    }
   }
-
-  const judgeCounts = results.map(r => r.times_judged);
-  const minJudged = Math.min(...judgeCounts);
-  const maxJudged = Math.max(...judgeCounts);
-  const avgJudged = (judgeCounts.reduce((a, b) => a + b, 0) / judgeCounts.length).toFixed(1);
-  const unjudged = judgeCounts.filter(c => c === 0).length;
-  const spread = maxJudged - minJudged;
-  const scored = results.filter(r => r.score !== null).length;
-
-  if (spread > 4) {
-    log(`  Fairness: poor (spread = ${spread})`, 'ERROR');
-    stats.totalErrors++;
-  }
-
-  // Complete event
-  try { await apiPost('/api/organizer/start', { event_id: event.id, action: 'complete' }); } catch (_) {}
-
-  const passed = stats.totalErrors === 0 && stats.concurrencyViolations.length === 0;
-
-  return {
-    scenario: tag,
-    passed,
-    duration,
-    teams: scenario.teams,
-    rooms: scenario.rooms.length,
-    judges: scenario.judges,
-    set_size: scenario.set_size,
-    setsCompleted: stats.totalSetsCompleted,
-    minJudged,
-    maxJudged,
-    avgJudged,
-    spread,
-    unjudged,
-    scored,
-    totalTeams: results.length,
-    errors: stats.totalErrors,
-    concurrencyViolations: stats.concurrencyViolations.length,
-    assignmentErrors: stats.assignmentErrors.length,
-    submissionErrors: stats.submissionErrors.length,
-  };
 }
 
 // ============================================
@@ -562,4 +583,11 @@ main().catch(e => {
   log(`Simulation crashed: ${e.message}`, 'ERROR');
   console.error(e);
   process.exit(1);
+});
+
+// Note: per-scenario `finally` blocks delete events as soon as a scenario ends,
+// so SIGINT in the middle of a scenario will only leak that one in-progress event.
+process.on('SIGINT', () => {
+  log('Caught SIGINT — exiting (in-progress event may need manual cleanup).', 'WARN');
+  process.exit(130);
 });

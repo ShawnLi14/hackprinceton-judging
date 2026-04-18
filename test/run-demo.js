@@ -11,6 +11,10 @@
  * 
  * Usage: node test/run-demo.js [BASE_URL]
  *   Default BASE_URL: http://localhost:3000
+ *
+ * The demo event is deleted automatically once the run completes (or on
+ * SIGINT/crash). Set KEEP_EVENTS=1 to retain it for inspection.
+ * Set SITE_PASSWORD=... if your /api/events password isn't 'hehe1414'.
  */
 
 const fs = require('fs');
@@ -71,6 +75,18 @@ async function apiPost(endpoint, body) {
   return api(endpoint, { method: 'POST', body: JSON.stringify(body) });
 }
 
+const SITE_PASSWORD = process.env.SITE_PASSWORD || 'hehe1414';
+
+async function deleteEvent(eventId) {
+  if (!eventId) return;
+  try {
+    await api(`/api/events?id=${eventId}&password=${encodeURIComponent(SITE_PASSWORD)}`, { method: 'DELETE' });
+    log(`Cleaned up event ${eventId}`, 'OK');
+  } catch (e) {
+    log(`Cleanup: failed to delete event ${eventId}: ${e.message}`, 'WARN');
+  }
+}
+
 // ============================================
 // Setup
 // ============================================
@@ -82,7 +98,7 @@ async function setupEvent() {
     target_judgings_per_team: 3,
     max_judging_minutes: 5,
     admin_code: 'DEMO-ADMIN',
-    password: 'hehe1414',
+    password: SITE_PASSWORD,
   });
   log(`Event created: ${event.name} (${event.id})`);
   return event;
@@ -314,6 +330,8 @@ class DemoJudgeBot {
 // ============================================
 // Main
 // ============================================
+let demoEventId = null;
+
 async function main() {
   startTime = Date.now();
   log('╔══════════════════════════════════════════╗');
@@ -321,10 +339,12 @@ async function main() {
   log('║   Open the dashboard to watch live!       ║');
   log('╚══════════════════════════════════════════╝');
   log(`Target: ${BASE_URL}`);
+  if (process.env.KEEP_EVENTS) log('KEEP_EVENTS set — demo event will NOT be cleaned up.');
   log('');
 
   // 1. Setup
   const event = await setupEvent();
+  demoEventId = event.id;
   await importData(event.id);
 
   log('');
@@ -393,8 +413,25 @@ async function main() {
   }
 }
 
-main().catch(e => {
-  log(`Demo crashed: ${e.message}`, 'ERROR');
-  console.error(e);
-  process.exit(1);
-});
+async function cleanup() {
+  if (demoEventId && !process.env.KEEP_EVENTS) {
+    await deleteEvent(demoEventId);
+  }
+}
+
+main()
+  .catch(e => {
+    log(`Demo crashed: ${e.message}`, 'ERROR');
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(cleanup);
+
+// Best-effort cleanup if the user kills the process mid-run.
+const interrupt = async (signal) => {
+  log(`Caught ${signal}, cleaning up...`, 'WARN');
+  await cleanup();
+  process.exit(130);
+};
+process.on('SIGINT', () => interrupt('SIGINT'));
+process.on('SIGTERM', () => interrupt('SIGTERM'));
