@@ -31,7 +31,7 @@ function SetupPageContent() {
 
   // Form states
   const [newRoom, setNewRoom] = useState({ name: '', room_number: '', floor: '1' });
-  const [newTeam, setNewTeam] = useState({ project_name: '', track: '', team_number: '', room_name: '' });
+  const [newTeam, setNewTeam] = useState({ project_name: '', track: '', team_number: '', room_name: '', devpost_url: '' });
   const [newJudge, setNewJudge] = useState({ name: '', access_code: '' });
   const [bulkRooms, setBulkRooms] = useState('');
   const [showBulkRoomImport, setShowBulkRoomImport] = useState(false);
@@ -125,9 +125,10 @@ function SetupPageContent() {
         track: newTeam.track || null,
         team_number: newTeam.team_number,
         room_id,
+        devpost_url: newTeam.devpost_url.trim() || null,
       }),
     });
-    setNewTeam({ project_name: '', track: '', team_number: '', room_name: '' });
+    setNewTeam({ project_name: '', track: '', team_number: '', room_name: '', devpost_url: '' });
     loadData();
   };
 
@@ -143,12 +144,20 @@ function SetupPageContent() {
     const errors: string[] = [];
     const teamsToCreate = lines.map((line, i) => {
       const parts = line.split(',').map(p => p.trim());
-      let project_name: string, track: string | null, team_number: string, roomName: string;
+      let project_name: string,
+        track: string | null,
+        team_number: string,
+        roomName: string,
+        devpost_url: string | null;
       if (parts.length === 3) {
         [project_name, team_number, roomName] = parts;
         track = null;
-      } else if (parts.length >= 4) {
+        devpost_url = null;
+      } else if (parts.length === 4) {
         [project_name, track, team_number, roomName] = parts;
+        devpost_url = null;
+      } else if (parts.length >= 5) {
+        [project_name, track, team_number, roomName, devpost_url] = parts;
       } else {
         return null;
       }
@@ -157,7 +166,14 @@ function SetupPageContent() {
         errors.push(`Line ${i + 1}: room "${roomName}" not found`);
         return null;
       }
-      return { event_id: eventId, project_name: project_name || null, track: track || null, team_number, room_id };
+      return {
+        event_id: eventId,
+        project_name: project_name || null,
+        track: track || null,
+        team_number,
+        room_id,
+        devpost_url: devpost_url ? devpost_url : null,
+      };
     }).filter(Boolean);
 
     if (errors.length > 0) {
@@ -417,11 +433,11 @@ function SetupPageContent() {
           <CardContent className="space-y-4">
             {showBulkImport ? (
               <div className="space-y-2">
-                <Label className="text-xs">CSV: project, track, team #, room name (one per line; track is optional)</Label>
+                <Label className="text-xs">CSV: project, track, team #, room name, devpost url (track and url are optional)</Label>
                 <Textarea
                   aria-label="Bulk team import"
                   className="min-h-[120px] font-mono text-sm"
-                  placeholder={`AI Project, Health, 1, ${rooms[0]?.name || 'Room A'}\nWeb App, Education, 2, ${rooms[0]?.name || 'Room A'}`}
+                  placeholder={`AI Project, Health, 1, ${rooms[0]?.name || 'Room A'}, https://devpost.com/software/ai-project\nWeb App, Education, 2, ${rooms[0]?.name || 'Room A'}`}
                   value={bulkTeams}
                   onChange={e => setBulkTeams(e.target.value)}
                 />
@@ -462,6 +478,14 @@ function SetupPageContent() {
                     </SelectContent>
                   </Select>
                 </div>
+                <Input
+                  aria-label="Devpost URL"
+                  type="url"
+                  placeholder="Devpost URL (optional)"
+                  value={newTeam.devpost_url}
+                  onChange={e => setNewTeam(p => ({ ...p, devpost_url: e.target.value }))}
+                  className="text-sm"
+                />
                 <Button onClick={addTeam} size="sm" className="w-full">Add team</Button>
               </div>
             )}
@@ -472,7 +496,21 @@ function SetupPageContent() {
                 return (
                   <div key={team.id} className="flex items-center justify-between rounded-lg bg-muted/35 px-3 py-2 text-sm">
                     <div className="min-w-0 flex-1">
-                      <span className="font-medium truncate block">{label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{label}</span>
+                        {team.devpost_url && (
+                          <a
+                            href={team.devpost_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-sky-700 underline underline-offset-2 hover:text-sky-900"
+                            aria-label={`Open Devpost link for ${label}`}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            Devpost ↗
+                          </a>
+                        )}
+                      </div>
                       <span className="text-xs text-muted-foreground">
                         {team.room?.name || '?'} · #{team.team_number}
                         {team.track ? ` · ${team.track}` : ''}

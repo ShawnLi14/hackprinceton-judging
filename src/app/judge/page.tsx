@@ -523,6 +523,17 @@ function VisitingPhase({
                   <h2 className="min-w-0 text-base font-medium tracking-[-0.01em]">
                     {st.team?.project_name || 'Untitled'}
                   </h2>
+                  {st.team?.devpost_url && (
+                    <a
+                      href={st.team.devpost_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-sky-700 underline underline-offset-2 hover:text-sky-900"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      Devpost ↗
+                    </a>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Room {st.team?.room?.name} · Table #{st.team?.team_number}
@@ -708,9 +719,23 @@ function RankItem({
           </div>
 
           <div className="min-w-0 space-y-0.5">
-            <h3 className="text-sm font-medium leading-snug truncate">
-              {setTeam.team?.project_name || 'Untitled'}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="min-w-0 text-sm font-medium leading-snug truncate">
+                {setTeam.team?.project_name || 'Untitled'}
+              </h3>
+              {setTeam.team?.devpost_url && (
+                <a
+                  href={setTeam.team.devpost_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onPointerDown={stopDrag}
+                  onClick={e => e.stopPropagation()}
+                  className="shrink-0 text-[11px] text-sky-700 underline underline-offset-2 hover:text-sky-900"
+                >
+                  Devpost ↗
+                </a>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground truncate">
               Room {setTeam.team?.room?.name} · Table #{setTeam.team?.team_number}
             </p>
@@ -790,9 +815,21 @@ function ReviewPhase({
                 <span className="text-base font-semibold tabular-nums">{rank}</span>
               </div>
               <div className="min-w-0 space-y-0.5">
-                <p className="text-sm font-medium truncate">
-                  {st.team?.project_name || 'Untitled'}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="min-w-0 text-sm font-medium truncate">
+                    {st.team?.project_name || 'Untitled'}
+                  </p>
+                  {st.team?.devpost_url && (
+                    <a
+                      href={st.team.devpost_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 text-[11px] text-sky-700 underline underline-offset-2 hover:text-sky-900"
+                    >
+                      Devpost ↗
+                    </a>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground truncate">
                   Room {st.team?.room?.name} · Table #{st.team?.team_number}
                 </p>

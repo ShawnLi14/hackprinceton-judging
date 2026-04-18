@@ -228,6 +228,12 @@ function DashboardContent() {
           </div>
 
           <div className="flex flex-wrap gap-2.5">
+            <Link
+              href={`/organizer/setup?event=${eventId}`}
+              className="inline-flex h-8 items-center justify-center rounded-md border bg-background px-3 text-xs font-medium text-foreground shadow-xs hover:bg-muted"
+            >
+              Add teams or judges
+            </Link>
             {event.status === 'active' && (
               <>
                 <Button size="sm" variant="outline" onClick={() => controlEvent('pause')}>

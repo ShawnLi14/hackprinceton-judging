@@ -82,6 +82,7 @@ export async function GET(req: NextRequest) {
       team_number: team.team_number,
       room_name: team.room?.name || 'Unknown',
       floor: team.room?.floor || 0,
+      devpost_url: team.devpost_url || null,
       times_judged: team.times_judged,
       num_rankings: agg?.count || 0,
       average_normalized_rank: averageNormalized,

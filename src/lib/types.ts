@@ -29,6 +29,7 @@ export interface Team {
   track: string | null;
   team_number: string;
   room_id: string;
+  devpost_url: string | null;
   times_judged: number;
   is_active: boolean;
   created_at: string;
@@ -108,6 +109,7 @@ export interface TeamStats {
   team_number: string;
   room_name: string;
   floor: number;
+  devpost_url: string | null;
   times_judged: number;
   is_locked: boolean;
   locked_by_judge: string | null;

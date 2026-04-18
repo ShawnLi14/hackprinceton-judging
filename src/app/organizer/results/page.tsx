@@ -21,6 +21,7 @@ interface TeamResult {
   team_number: string;
   room_name: string;
   floor: number;
+  devpost_url: string | null;
   times_judged: number;
   num_rankings: number;
   average_normalized_rank: number | null;
@@ -48,9 +49,9 @@ function ResultsContent() {
   const bestScore = judgedTeams.length ? Math.max(...judgedTeams.map(result => result.score ?? 0)) : null;
 
   const exportCSV = () => {
-    const header = 'Rank,Project,Track,Relative Score (/5),Times Judged,Rank Entries,Room,Floor,Team #\n';
+    const header = 'Rank,Project,Track,Devpost URL,Relative Score (/5),Times Judged,Rank Entries,Room,Floor,Team #\n';
     const rows = results.map((result, idx) =>
-      `${idx + 1},"${result.project_name || 'Untitled'}","${result.track || ''}",${result.score !== null ? result.score.toFixed(1) : 'N/A'},${result.times_judged},${result.num_rankings},"${result.room_name}",${result.floor},${result.team_number}`
+      `${idx + 1},"${result.project_name || 'Untitled'}","${result.track || ''}","${result.devpost_url || ''}",${result.score !== null ? result.score.toFixed(1) : 'N/A'},${result.times_judged},${result.num_rankings},"${result.room_name}",${result.floor},${result.team_number}`
     ).join('\n');
 
     const blob = new Blob([header + rows], { type: 'text/csv' });
@@ -148,7 +149,20 @@ function ResultsContent() {
                       {rankInTrack}
                     </span>
                   </TableCell>
-                  <TableCell className="text-sm font-medium">{team.project_name || 'Untitled'}</TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {team.devpost_url ? (
+                      <a
+                        href={team.devpost_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2 hover:text-sky-700"
+                      >
+                        {team.project_name || 'Untitled'}
+                      </a>
+                    ) : (
+                      team.project_name || 'Untitled'
+                    )}
+                  </TableCell>
                   {hasTracks && (
                     <TableCell className="text-sm">
                       {team.track ? <Badge variant="outline">{team.track}</Badge> : <span className="text-muted-foreground">—</span>}

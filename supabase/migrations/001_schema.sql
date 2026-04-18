@@ -36,6 +36,7 @@ CREATE TABLE teams (
   track TEXT,
   team_number TEXT NOT NULL,
   room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  devpost_url TEXT,           -- optional link to a Devpost (or other) submission
   times_judged INTEGER NOT NULL DEFAULT 0,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()

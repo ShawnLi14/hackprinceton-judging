@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       track: t.track || null,
       team_number: t.team_number,
       room_id: t.room_id,
+      devpost_url: t.devpost_url || null,
     })))
     .select();
 

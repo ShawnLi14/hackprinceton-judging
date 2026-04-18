@@ -6,8 +6,9 @@ import { supabase } from '@/lib/supabase';
 // Body: { event_id, type: 'rooms' | 'teams' | 'judges', data: string }
 // Data format (one per line, comma-separated):
 //   rooms:  name, room_number, floor
-//   teams:  project_name, track, team_number, room_name   (4 fields)
-//       or: project_name, team_number, room_name          (3 fields, no track)
+//   teams:  project_name, track, team_number, room_name, devpost_url   (5 fields)
+//       or: project_name, track, team_number, room_name                (4 fields, no URL)
+//       or: project_name, team_number, room_name                       (3 fields, no track or URL)
 //   judges: name, access_code
 export async function POST(req: NextRequest) {
   const { event_id, type, data } = await req.json();
@@ -65,13 +66,21 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        let project_name: string, track: string | null, team_number: string, room_name: string;
+        let project_name: string,
+          track: string | null,
+          team_number: string,
+          room_name: string,
+          devpost_url: string | null;
 
         if (parts.length === 3) {
           [project_name, team_number, room_name] = parts;
           track = null;
-        } else {
+          devpost_url = null;
+        } else if (parts.length === 4) {
           [project_name, track, team_number, room_name] = parts;
+          devpost_url = null;
+        } else {
+          [project_name, track, team_number, room_name, devpost_url] = parts;
         }
 
         const room_id = roomMap.get(room_name.toLowerCase());
@@ -86,6 +95,7 @@ export async function POST(req: NextRequest) {
           track: track || null,
           team_number,
           room_id,
+          devpost_url: devpost_url ? devpost_url : null,
         });
       }
 
