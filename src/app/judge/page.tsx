@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Reorder, useDragControls } from 'motion/react';
+import { Reorder } from 'motion/react';
 import {
   ArrowDown,
   ArrowUp,
@@ -23,12 +23,6 @@ import type { Judge, JudgingSetTeam, JudgingSetWithTeams, Room, Team } from '@/l
 
 type SetTeamWithDetails = JudgingSetTeam & { team: Team & { room: Room } };
 type Phase = 'login' | 'waiting' | 'on_break' | 'visiting' | 'ranking' | 'review';
-
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd'];
-  const v = n % 100;
-  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
-}
 
 function JudgePageContent() {
   const searchParams = useSearchParams();
@@ -674,7 +668,6 @@ function RankItem({
   teamId,
   setTeam,
   rank,
-  total,
   isFirst,
   isLast,
   onMoveUp,
@@ -691,34 +684,27 @@ function RankItem({
   onMoveDown: () => void;
   onMarkAbsent: () => void;
 }) {
-  const controls = useDragControls();
-  const isTop = rank === 1 && total > 1;
-  const isBottom = rank === total && total > 1;
+  // Buttons inside a draggable item must stop pointerdown from bubbling so
+  // tapping them doesn't initiate a drag gesture.
+  const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
 
   return (
     <Reorder.Item
       value={teamId}
-      dragListener={false}
-      dragControls={controls}
-      className="touch-none rounded-xl border border-border/60 bg-background"
+      className="touch-none cursor-grab rounded-xl border border-border/60 bg-background select-none active:cursor-grabbing"
       whileDrag={{ scale: 1.02, boxShadow: '0 14px 30px -16px rgba(0,0,0,0.25)', zIndex: 10 }}
     >
       <div className="flex items-stretch gap-1 p-2 sm:p-3">
-        <button
-          type="button"
-          aria-label={`Drag to reorder ${setTeam.team?.project_name || 'team'}`}
-          onPointerDown={e => controls.start(e)}
-          className="flex w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
+        <div
+          aria-hidden="true"
+          className="flex w-9 shrink-0 items-center justify-center text-muted-foreground"
         >
-          <GripVertical className="size-5" aria-hidden="true" />
-        </button>
+          <GripVertical className="size-5" />
+        </div>
 
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="flex w-10 shrink-0 flex-col items-center">
+          <div className="flex w-8 shrink-0 items-center justify-center">
             <span className="text-base font-semibold leading-none tabular-nums">{rank}</span>
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              {ordinal(rank).slice(-2)}
-            </span>
           </div>
 
           <div className="min-w-0 space-y-0.5">
@@ -728,10 +714,6 @@ function RankItem({
             <p className="text-xs text-muted-foreground truncate">
               Room {setTeam.team?.room?.name} · Table #{setTeam.team?.team_number}
             </p>
-            <div className="flex flex-wrap gap-1 pt-1">
-              {isTop && <Badge className="bg-amber-100 text-amber-900 text-[10px]">Top pick</Badge>}
-              {isBottom && <Badge variant="outline" className="text-[10px]">Bottom</Badge>}
-            </div>
           </div>
         </div>
 
@@ -739,6 +721,7 @@ function RankItem({
           <Button
             variant="outline"
             size="icon"
+            onPointerDown={stopDrag}
             onClick={onMoveUp}
             disabled={isFirst}
             aria-label={`Move ${setTeam.team?.project_name || 'team'} up`}
@@ -749,6 +732,7 @@ function RankItem({
           <Button
             variant="outline"
             size="icon"
+            onPointerDown={stopDrag}
             onClick={onMoveDown}
             disabled={isLast}
             aria-label={`Move ${setTeam.team?.project_name || 'team'} down`}
@@ -763,6 +747,7 @@ function RankItem({
         <Button
           variant="ghost"
           size="sm"
+          onPointerDown={stopDrag}
           onClick={onMarkAbsent}
           className="h-8 rounded-md text-xs text-muted-foreground"
         >
@@ -801,11 +786,8 @@ function ReviewPhase({
               key={teamId}
               className="flex items-center gap-3 rounded-xl border border-border/60 bg-background p-3"
             >
-              <div className="flex w-10 shrink-0 flex-col items-center">
+              <div className="flex w-8 shrink-0 items-center justify-center">
                 <span className="text-base font-semibold tabular-nums">{rank}</span>
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {ordinal(rank).slice(-2)}
-                </span>
               </div>
               <div className="min-w-0 space-y-0.5">
                 <p className="text-sm font-medium truncate">
