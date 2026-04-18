@@ -367,14 +367,21 @@ export async function reclaimActiveAssignmentsForJudge(judgeId: string): Promise
 
 export async function submitJudgingSet(
   judgingSetId: string,
-  evaluations: { team_id: string; score?: number | null; notes?: string; is_absent?: boolean }[]
+  evaluations: {
+    team_id: string;
+    rank?: number | null;
+    /** @deprecated Use `rank`. Retained for callers that still send `score`. */
+    score?: number | null;
+    notes?: string;
+    is_absent?: boolean;
+  }[]
 ): Promise<boolean> {
   const { error } = await supabase
     .rpc('submit_judging_set', {
       p_set_id: judgingSetId,
       p_rankings: evaluations.map(evaluation => ({
         team_id: evaluation.team_id,
-        rank: evaluation.score ?? null,
+        rank: evaluation.rank ?? evaluation.score ?? null,
         notes: evaluation.notes || null,
         is_absent: evaluation.is_absent || false,
       })),

@@ -320,19 +320,18 @@ class JudgeBot {
   }
 
   async submitRankings(set) {
-    const teams = (set.judging_set_teams || []).filter(st => !st.is_absent);
-    const shuffled = [...teams].sort(() => Math.random() - 0.5);
-    const maxRank = Math.min(shuffled.length, 5);
-    const rankings = set.judging_set_teams.map(st => {
-      const rankIdx = shuffled.findIndex(s => s.team_id === st.team_id);
-      const rank = rankIdx >= 0 ? Math.min(rankIdx + 1, maxRank) : maxRank;
-      return {
-        team_id: st.team_id,
-        rank,
-        notes: `Bot ${this.botId} auto-ranking`,
-        is_absent: false,
-      };
-    });
+    // Build a contiguous 1..K ranking among present teams. Absent teams get rank=null.
+    const presentTeams = (set.judging_set_teams || []).filter(st => !st.is_absent);
+    const shuffled = [...presentTeams].sort(() => Math.random() - 0.5);
+    const rankByTeam = new Map();
+    shuffled.forEach((st, idx) => rankByTeam.set(st.team_id, idx + 1));
+
+    const evaluations = (set.judging_set_teams || []).map(st => ({
+      team_id: st.team_id,
+      rank: rankByTeam.get(st.team_id) ?? null,
+      notes: `Bot ${this.botId} auto-ranking`,
+      is_absent: !rankByTeam.has(st.team_id),
+    }));
 
     for (const st of set.judging_set_teams || []) {
       this.stats.activeTeamLocks.delete(st.team_id);
@@ -341,7 +340,7 @@ class JudgeBot {
     try {
       await apiPost('/api/judges/submit', {
         judging_set_id: set.id,
-        rankings,
+        evaluations,
       });
       this.stats.totalSetsCompleted++;
       this.setsCompleted++;

@@ -48,7 +48,7 @@ function ResultsContent() {
   const bestScore = judgedTeams.length ? Math.max(...judgedTeams.map(result => result.score ?? 0)) : null;
 
   const exportCSV = () => {
-    const header = 'Rank,Project,Track,Average Score (/5),Times Judged,Score Entries,Room,Floor,Team #\n';
+    const header = 'Rank,Project,Track,Relative Score (/5),Times Judged,Rank Entries,Room,Floor,Team #\n';
     const rows = results.map((result, idx) =>
       `${idx + 1},"${result.project_name || 'Untitled'}","${result.track || ''}",${result.score !== null ? result.score.toFixed(1) : 'N/A'},${result.times_judged},${result.num_rankings},"${result.room_name}",${result.floor},${result.team_number}`
     ).join('\n');
@@ -80,7 +80,7 @@ function ResultsContent() {
             <div className="space-y-1">
               <h1 className="text-base font-semibold text-balance">Judging results</h1>
               <p className="text-sm text-muted-foreground text-pretty">
-                Teams are sorted by {hasTracks ? 'track, then by ' : ''}average score on a 1 to 5 scale, where 5 is the strongest result.
+                Teams are sorted by {hasTracks ? 'track, then by ' : ''}relative score on a 0 to 5 scale derived from judges&rsquo; rankings — 5 means always ranked first within a set, 0 means always last.
               </p>
             </div>
 
@@ -107,9 +107,9 @@ function ResultsContent() {
             <TableHead className="w-16 text-center text-xs font-medium text-muted-foreground">Rank</TableHead>
             <TableHead className="text-xs font-medium text-muted-foreground">Project</TableHead>
             {hasTracks && <TableHead className="text-xs font-medium text-muted-foreground">Track</TableHead>}
-            <TableHead className="text-center text-xs font-medium text-muted-foreground">Score</TableHead>
+            <TableHead className="text-center text-xs font-medium text-muted-foreground">Relative score</TableHead>
             <TableHead className="text-center text-xs font-medium text-muted-foreground">Judgings</TableHead>
-            <TableHead className="text-center text-xs font-medium text-muted-foreground">Entries</TableHead>
+            <TableHead className="text-center text-xs font-medium text-muted-foreground">Ranks</TableHead>
             <TableHead className="text-xs font-medium text-muted-foreground">Room</TableHead>
             <TableHead className="text-center text-xs font-medium text-muted-foreground">Floor</TableHead>
           </TableRow>

@@ -226,22 +226,23 @@ class DemoJudgeBot {
     this.log('  Thinking about rankings...');
     await sleep(RANK_THINK_TIME);
 
-    const teams = set.judging_set_teams || [];
-    const shuffled = [...teams].sort(() => Math.random() - 0.5);
-    const rankings = teams.map(st => {
-      const rankIdx = shuffled.findIndex(s => s.team_id === st.team_id);
-      return {
-        team_id: st.team_id,
-        rank: rankIdx + 1,
-        notes: `Demo ranking by ${this.name}`,
-        is_absent: false,
-      };
-    });
+    // Build a contiguous 1..K ranking among present teams.
+    const presentTeams = (set.judging_set_teams || []).filter(st => !st.is_absent);
+    const shuffled = [...presentTeams].sort(() => Math.random() - 0.5);
+    const rankByTeam = new Map();
+    shuffled.forEach((st, idx) => rankByTeam.set(st.team_id, idx + 1));
+
+    const evaluations = (set.judging_set_teams || []).map(st => ({
+      team_id: st.team_id,
+      rank: rankByTeam.get(st.team_id) ?? null,
+      notes: `Demo ranking by ${this.name}`,
+      is_absent: !rankByTeam.has(st.team_id),
+    }));
 
     try {
       await apiPost('/api/judges/submit', {
         judging_set_id: set.id,
-        rankings,
+        evaluations,
       });
 
       this.setsCompleted++;
