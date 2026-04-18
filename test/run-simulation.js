@@ -141,17 +141,6 @@ const SCENARIOS = [
 // ============================================
 // Data Generation
 // ============================================
-const ADJECTIVES = [
-  'Quantum', 'Neural', 'Cyber', 'Digital', 'Pixel', 'Cloud', 'Hyper', 'Nano',
-  'Solar', 'Astro', 'Turbo', 'Mega', 'Ultra', 'Sonic', 'Fusion', 'Alpha',
-  'Beta', 'Gamma', 'Delta', 'Omega', 'Zen', 'Nova', 'Apex', 'Echo',
-  'Blaze', 'Storm', 'Swift', 'Spark', 'Flux', 'Vibe', 'Neon', 'Pulse',
-];
-const NOUNS = [
-  'Hackers', 'Coders', 'Builders', 'Makers', 'Creators', 'Devs', 'Squad',
-  'Labs', 'Works', 'Forge', 'Studio', 'Dynamics', 'Systems', 'Collective',
-  'Alliance', 'Brigade', 'Crew', 'Team', 'Force', 'Unit', 'Hub', 'Node',
-];
 const PROJECTS = [
   'AI Assistant', 'Health Tracker', 'Study Buddy', 'Food Finder', 'Transit App',
   'Budget Planner', 'Eco Monitor', 'Music Generator', 'AR Navigator', 'Chat Platform',
@@ -179,21 +168,12 @@ function generateRoomsText(rooms) {
 }
 
 function generateTeamsText(count, rooms) {
-  const lines = ['# Team Name, Project Name, Track, Team Number, Room Name'];
-  const usedNames = new Set();
+  const lines = ['# Project Name, Track, Team Number, Room Name'];
   for (let i = 1; i <= count; i++) {
-    let name;
-    do {
-      const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-      const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-      name = `${adj} ${noun}`;
-    } while (usedNames.has(name));
-    usedNames.add(name);
-
-    const project = PROJECTS[Math.floor(Math.random() * PROJECTS.length)];
+    const project = `${PROJECTS[Math.floor(Math.random() * PROJECTS.length)]} #${i}`;
     const track = TRACKS[Math.floor(Math.random() * TRACKS.length)];
     const room = rooms[(i - 1) % rooms.length];
-    lines.push(`${name}, ${project}, ${track}, ${i}, ${room.name}`);
+    lines.push(`${project}, ${track}, ${i}, ${room.name}`);
   }
   return lines.join('\n') + '\n';
 }
@@ -293,7 +273,7 @@ class JudgeBot {
       for (const st of set.judging_set_teams || []) {
         const existingJudge = this.stats.activeTeamLocks.get(st.team_id);
         if (existingJudge) {
-          const violation = `Team ${st.team?.name || st.team_id} assigned to BOTH ${existingJudge} AND ${this.name}`;
+          const violation = `Team ${st.team?.project_name || st.team_id} assigned to BOTH ${existingJudge} AND ${this.name}`;
           log(violation, 'ERROR');
           this.stats.concurrencyViolations.push(violation);
         }

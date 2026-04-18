@@ -398,18 +398,12 @@ function JudgePageContent() {
                         <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-muted/70 px-2 text-sm font-medium tabular-nums">
                           {setTeam.visit_order}
                         </span>
-                        <h2 className="min-w-0 text-base font-medium tracking-[-0.01em]">{setTeam.team?.name}</h2>
+                        <h2 className="min-w-0 text-base font-medium tracking-[-0.01em]">{setTeam.team?.project_name || 'Untitled'}</h2>
                         {isVisited && !isAbsent && (
                           <Badge className="bg-emerald-100 text-emerald-900">Visited</Badge>
                         )}
                         {isAbsent && <Badge variant="outline">Absent</Badge>}
                       </div>
-
-                      {setTeam.team?.project_name && (
-                        <p className="text-sm leading-6 text-muted-foreground text-pretty">
-                          {setTeam.team.project_name}
-                        </p>
-                      )}
 
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="outline">Room {setTeam.team?.room?.name}</Badge>

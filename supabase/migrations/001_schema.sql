@@ -28,10 +28,10 @@ CREATE TABLE rooms (
 CREATE INDEX idx_rooms_event ON rooms(event_id);
 
 -- Teams: hackathon teams/projects
+-- Identified by their project (no separate "team name"); display falls back to "Untitled" when project_name is null.
 CREATE TABLE teams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
   project_name TEXT,
   track TEXT,
   team_number TEXT NOT NULL,

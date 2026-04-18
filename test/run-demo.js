@@ -164,7 +164,7 @@ class DemoJudgeBot {
       const teams = result.set.judging_set_teams || [];
       const teamNames = teams
         .sort((a, b) => a.visit_order - b.visit_order)
-        .map(st => `${st.team?.name || '?'} (${st.team?.room?.name} #${st.team?.team_number})`)
+        .map(st => `${st.team?.project_name || 'Untitled'} (${st.team?.room?.name} #${st.team?.team_number})`)
         .join(', ');
 
       this.log(`Got set with ${teams.length} teams: ${teamNames}`);
@@ -184,7 +184,7 @@ class DemoJudgeBot {
 
     for (let i = 0; i < teams.length; i++) {
       const st = teams[i];
-      const teamName = st.team?.name || 'Unknown';
+      const teamName = st.team?.project_name || 'Untitled';
       const room = st.team?.room?.name || '?';
       const teamNum = st.team?.team_number || '?';
 

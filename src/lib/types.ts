@@ -25,7 +25,6 @@ export interface Room {
 export interface Team {
   id: string;
   event_id: string;
-  name: string;
   project_name: string | null;
   track: string | null;
   team_number: string;
@@ -104,7 +103,6 @@ export interface JudgeWithDetails extends Judge {
 
 export interface TeamStats {
   id: string;
-  name: string;
   project_name: string | null;
   track: string | null;
   team_number: string;

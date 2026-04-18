@@ -26,7 +26,6 @@ export async function POST(req: NextRequest) {
     .from('teams')
     .insert(teams.map(t => ({
       event_id: t.event_id,
-      name: t.name,
       project_name: t.project_name || null,
       track: t.track || null,
       team_number: t.team_number,

@@ -6,9 +6,8 @@ import { supabase } from '@/lib/supabase';
 // Body: { event_id, type: 'rooms' | 'teams' | 'judges', data: string }
 // Data format (one per line, comma-separated):
 //   rooms:  name, room_number, floor
-//   teams:  team_name, project_name, track, team_number, room_name   (5 fields)
-//       or: team_name, project_name, team_number, room_name          (4 fields, no track)
-//       or: team_name, team_number, room_name                        (3 fields, minimal)
+//   teams:  project_name, track, team_number, room_name   (4 fields)
+//       or: project_name, team_number, room_name          (3 fields, no track)
 //   judges: name, access_code
 export async function POST(req: NextRequest) {
   const { event_id, type, data } = await req.json();
@@ -62,21 +61,17 @@ export async function POST(req: NextRequest) {
       for (let i = 0; i < lines.length; i++) {
         const parts = lines[i].split(',').map((s: string) => s.trim());
         if (parts.length < 3) {
-          errors.push(`Line ${i + 1}: expected at least 3 fields (name, team_number, room_name), got ${parts.length}`);
+          errors.push(`Line ${i + 1}: expected at least 3 fields (project_name, team_number, room_name), got ${parts.length}`);
           continue;
         }
 
-        let name: string, project_name: string | null, track: string | null, team_number: string, room_name: string;
+        let project_name: string, track: string | null, team_number: string, room_name: string;
 
         if (parts.length === 3) {
-          [name, team_number, room_name] = parts;
-          project_name = null;
-          track = null;
-        } else if (parts.length === 4) {
-          [name, project_name, team_number, room_name] = parts;
+          [project_name, team_number, room_name] = parts;
           track = null;
         } else {
-          [name, project_name, track, team_number, room_name] = parts;
+          [project_name, track, team_number, room_name] = parts;
         }
 
         const room_id = roomMap.get(room_name.toLowerCase());
@@ -87,7 +82,6 @@ export async function POST(req: NextRequest) {
 
         teams.push({
           event_id,
-          name,
           project_name: project_name || null,
           track: track || null,
           team_number,

@@ -198,7 +198,7 @@ function DashboardContent() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const sortedTeams = [...teams].sort((a, b) => a.times_judged - b.times_judged || a.name.localeCompare(b.name));
+  const sortedTeams = [...teams].sort((a, b) => a.times_judged - b.times_judged || (a.project_name || '').localeCompare(b.project_name || ''));
 
   return (
     <div className="space-y-8">
@@ -333,7 +333,7 @@ function DashboardContent() {
                             </span>
                             <div className="min-w-0 space-y-0.5">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-medium">{setTeam.team?.name || 'Unknown team'}</span>
+                                <span className="text-sm font-medium">{setTeam.team?.project_name || 'Untitled'}</span>
                                 {setTeam.is_visited && (
                                   <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] text-emerald-800">
                                     visited
@@ -372,13 +372,13 @@ function DashboardContent() {
               >
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-sm font-medium">{team.name}</h2>
+                    <h2 className="text-sm font-medium">{team.project_name || 'Untitled'}</h2>
                     <span className="rounded-lg bg-stone-100 px-2.5 py-1 text-[11px] text-stone-600">
                       #{team.team_number}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {team.project_name || 'No project title'} · {team.room?.name || '?'} · Floor {team.room?.floor || '?'}
+                    {team.room?.name || '?'} · Floor {team.room?.floor || '?'}
                   </p>
                 </div>
 

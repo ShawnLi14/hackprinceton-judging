@@ -16,7 +16,6 @@ import {
 
 interface TeamResult {
   id: string;
-  name: string;
   project_name: string | null;
   track: string | null;
   team_number: string;
@@ -49,9 +48,9 @@ function ResultsContent() {
   const bestScore = judgedTeams.length ? Math.max(...judgedTeams.map(result => result.score ?? 0)) : null;
 
   const exportCSV = () => {
-    const header = 'Rank,Team,Project,Track,Average Score (/5),Times Judged,Score Entries,Room,Floor,Team #\n';
+    const header = 'Rank,Project,Track,Average Score (/5),Times Judged,Score Entries,Room,Floor,Team #\n';
     const rows = results.map((result, idx) =>
-      `${idx + 1},"${result.name}","${result.project_name || ''}","${result.track || ''}",${result.score !== null ? result.score.toFixed(1) : 'N/A'},${result.times_judged},${result.num_rankings},"${result.room_name}",${result.floor},${result.team_number}`
+      `${idx + 1},"${result.project_name || 'Untitled'}","${result.track || ''}",${result.score !== null ? result.score.toFixed(1) : 'N/A'},${result.times_judged},${result.num_rankings},"${result.room_name}",${result.floor},${result.team_number}`
     ).join('\n');
 
     const blob = new Blob([header + rows], { type: 'text/csv' });
@@ -106,7 +105,6 @@ function ResultsContent() {
         <TableHeader>
           <TableRow>
             <TableHead className="w-16 text-center text-xs font-medium text-muted-foreground">Rank</TableHead>
-            <TableHead className="text-xs font-medium text-muted-foreground">Team</TableHead>
             <TableHead className="text-xs font-medium text-muted-foreground">Project</TableHead>
             {hasTracks && <TableHead className="text-xs font-medium text-muted-foreground">Track</TableHead>}
             <TableHead className="text-center text-xs font-medium text-muted-foreground">Score</TableHead>
@@ -126,7 +124,7 @@ function ResultsContent() {
               if (showTrackHeader) rankInTrack = 0;
               lastTrack = team.track;
               rankInTrack++;
-              const colSpan = hasTracks ? 9 : 8;
+              const colSpan = hasTracks ? 8 : 7;
 
               return (
                 <>{showTrackHeader && (
@@ -150,8 +148,7 @@ function ResultsContent() {
                       {rankInTrack}
                     </span>
                   </TableCell>
-                  <TableCell className="text-sm font-medium">{team.name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{team.project_name || '—'}</TableCell>
+                  <TableCell className="text-sm font-medium">{team.project_name || 'Untitled'}</TableCell>
                   {hasTracks && (
                     <TableCell className="text-sm">
                       {team.track ? <Badge variant="outline">{team.track}</Badge> : <span className="text-muted-foreground">—</span>}

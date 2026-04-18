@@ -44,7 +44,6 @@ export async function GET(req: NextRequest) {
     const averageScore = scores ? scores.totalScore / scores.count : null;
     return {
       id: team.id,
-      name: team.name,
       project_name: team.project_name,
       track: team.track || null,
       team_number: team.team_number,
