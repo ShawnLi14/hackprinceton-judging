@@ -59,15 +59,19 @@ export async function GET(req: NextRequest) {
     bucket.rows.push({ team_id: row.team_id, rank: row.rank });
   }
 
-  // Aggregate normalized scores per team.
-  const teamAgg: Record<string, { sum: number; count: number }> = {};
+  // Aggregate normalized scores per team. We also track first_place_count:
+  // the number of completed sets in which the team was ranked #1 among the
+  // present teams. This is surfaced separately in the UI and used as the
+  // primary tiebreaker when display scores are equal.
+  const teamAgg: Record<string, { sum: number; count: number; firsts: number }> = {};
   for (const { presentCount, rows } of setBuckets.values()) {
     for (const { team_id, rank } of rows) {
       const norm =
         presentCount <= 1 ? 1 : (presentCount - rank) / (presentCount - 1);
-      if (!teamAgg[team_id]) teamAgg[team_id] = { sum: 0, count: 0 };
+      if (!teamAgg[team_id]) teamAgg[team_id] = { sum: 0, count: 0, firsts: 0 };
       teamAgg[team_id].sum += norm;
       teamAgg[team_id].count += 1;
+      if (rank === 1) teamAgg[team_id].firsts += 1;
     }
   }
 
@@ -83,15 +87,17 @@ export async function GET(req: NextRequest) {
       room_name: team.room?.name || 'Unknown',
       floor: team.room?.floor || 0,
       devpost_url: team.devpost_url || null,
+      opt_in_prizes: (team.opt_in_prizes as string[] | null) || [],
       times_judged: team.times_judged,
       num_rankings: agg?.count || 0,
+      first_place_count: agg?.firsts || 0,
       average_normalized_rank: averageNormalized,
       score: displayScore,
     };
   });
 
-  // Sort by track (alphabetical, nulls last), then score desc, then
-  // num_rankings desc as a confidence tiebreaker, then project_name alpha.
+  // Sort by track (alphabetical, nulls last), then score desc, then break ties
+  // with: first_place_count desc -> num_rankings desc (confidence) -> name.
   results.sort((a, b) => {
     const trackA = a.track || '';
     const trackB = b.track || '';
@@ -104,6 +110,9 @@ export async function GET(req: NextRequest) {
     if (b.score === null && a.score !== null) return -1;
     if (a.score !== null && b.score !== null && a.score !== b.score) {
       return b.score - a.score;
+    }
+    if (a.first_place_count !== b.first_place_count) {
+      return b.first_place_count - a.first_place_count;
     }
     if (a.num_rankings !== b.num_rankings) return b.num_rankings - a.num_rankings;
     return (a.project_name || '').localeCompare(b.project_name || '');

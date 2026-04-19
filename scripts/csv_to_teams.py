@@ -4,22 +4,38 @@ app's bulk importer understands.
 
 Output line format (one team per line, comma-separated):
 
-    project_name, track, table_number, room_name, devpost_url
+    project_name, track, table_number, room_name, devpost_url, prize1|prize2|...
 
-`devpost_url` is the only optional field — it's emitted as an empty string when
-the source CSV doesn't provide it. The bulk importer tolerates 3, 4, or 5
-fields per line.
+The 6th field (opt-in prizes) is `|`-separated because prize names often
+contain commas (the outer separator).
+
+Devpost exports one CSV row per (submission, opt-in prize) pair, so a
+submission opted into N prizes appears as N rows. This script collapses
+duplicate rows by submission key and aggregates the distinct `Opt-In Prize`
+values into the 6th field.
+
+Submission key (used to dedup):
+    `Submission Url` if present, else `Project Title + Submitter Email`.
+URL alone collides on drafts (no URL); title alone collides on many
+"Untitled" drafts; the email disambiguates the draft case.
 
 Behavior:
     - Skips rows whose `Project Status` is "Draft" (case/whitespace-insensitive).
     - Empty `Project Title` is allowed and emitted as "Untitled".
+    - When `Submitter First Name` / `Submitter Last Name` are present, the
+      submitter is appended to the project name in parentheses — e.g.
+      "Recall (Jossue Sarango)" — so judges/organizers can disambiguate
+      multiple submissions sharing a generic title (very common with
+      "Untitled" drafts that slip past the draft filter).
     - Empty / missing track is emitted as "Unspecified".
     - `table_number` and `room_name` are placeholders (TBD) — fill them in
       manually before running the bulk import.
     - `Submission Url` (case-insensitive lookup) is emitted as the 5th field.
-    - Commas inside a field are replaced with a space so the importer's naive
-      `split(',')` parser still works.
-    - Duplicate submissions are kept (one line each).
+    - `Opt-In Prize` values are sanitized (commas -> spaces) and joined with
+      `|` in the 6th field. Submissions with no opt-ins emit an empty 6th
+      field, which the importer tolerates.
+    - Commas inside any field are replaced with a space so the importer's
+      naive `split(',')` parser still works.
 
 Usage:
     python scripts/csv_to_teams.py <input.csv> [output.txt]
@@ -38,6 +54,10 @@ from pathlib import Path
 PROJECT_COLUMN = "Project Title"
 STATUS_COLUMN = "Project Status"
 TRACK_COLUMN = "What Main Hack Princeton Track Are You Submitted For?"
+PRIZE_COLUMN = "Opt-In Prize"
+SUBMITTER_EMAIL_COLUMN = "Submitter Email"
+SUBMITTER_FIRST_COLUMN = "Submitter First Name"
+SUBMITTER_LAST_COLUMN = "Submitter Last Name"
 URL_COLUMN_CANDIDATES = ("Submission Url", "Submission URL", "Submission url")
 
 DEFAULT_PROJECT = "Untitled"
@@ -45,7 +65,7 @@ DEFAULT_TRACK = "Unspecified"
 PLACEHOLDER_TABLE = "TBD"
 PLACEHOLDER_ROOM = "TBD"
 
-HEADER = "# Project Name, Track, Table Number, Room Name, Devpost URL"
+HEADER = "# Project Name, Track, Table Number, Room Name, Devpost URL, Prize1|Prize2|..."
 
 
 def sanitize(value: str | None) -> str:
@@ -54,6 +74,14 @@ def sanitize(value: str | None) -> str:
         return ""
     cleaned = value.replace(",", " ").replace("\r", " ").replace("\n", " ")
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def sanitize_prize(value: str | None) -> str:
+    """Sanitize a prize name and also strip the `|` we use as inner delimiter."""
+    cleaned = sanitize(value)
+    if "|" in cleaned:
+        cleaned = re.sub(r"\s*\|\s*", " ", cleaned).strip()
     return cleaned
 
 
@@ -103,9 +131,15 @@ def main() -> int:
             return 1
 
         url_column = find_url_column(fieldnames)
-        rows_with_url = 0
+        has_prize_column = PRIZE_COLUMN in fieldnames
+        has_email_column = SUBMITTER_EMAIL_COLUMN in fieldnames
+        has_first_column = SUBMITTER_FIRST_COLUMN in fieldnames
+        has_last_column = SUBMITTER_LAST_COLUMN in fieldnames
 
-        kept_lines: list[str] = []
+        # Submissions keyed by (url) or (title + email). Each entry remembers
+        # the first non-empty representative row plus the union of prize names.
+        submissions: dict[str, dict[str, object]] = {}
+        order: list[str] = []
         skipped_drafts = 0
         total_rows = 0
 
@@ -119,12 +153,57 @@ def main() -> int:
             project = sanitize(row.get(PROJECT_COLUMN)) or DEFAULT_PROJECT
             track = sanitize(row.get(TRACK_COLUMN)) or DEFAULT_TRACK
             url = sanitize(row.get(url_column)) if url_column else ""
-            if url:
-                rows_with_url += 1
+            email = sanitize(row.get(SUBMITTER_EMAIL_COLUMN)) if has_email_column else ""
+            first = sanitize(row.get(SUBMITTER_FIRST_COLUMN)) if has_first_column else ""
+            last = sanitize(row.get(SUBMITTER_LAST_COLUMN)) if has_last_column else ""
+            prize = sanitize_prize(row.get(PRIZE_COLUMN)) if has_prize_column else ""
 
-            kept_lines.append(
-                f"{project}, {track}, {PLACEHOLDER_TABLE}, {PLACEHOLDER_ROOM}, {url}"
-            )
+            submitter = " ".join(part for part in (first, last) if part)
+            # Always disambiguate with the submitter's name when we have one,
+            # so projects sharing a title (frequent for "Untitled" drafts and
+            # the occasional generic name like "Recall") don't visually
+            # collide in the judge / results UIs. Format: "Title (Submitter)".
+            if submitter:
+                project_display = f"{project} ({submitter})"
+            else:
+                project_display = project
+
+            key = url if url else f"{project.lower()}|{email.lower()}"
+
+            entry = submissions.get(key)
+            if entry is None:
+                entry = {
+                    "project": project_display,
+                    "track": track,
+                    "url": url,
+                    "prizes": [],  # list to preserve first-seen order, dedup below
+                }
+                submissions[key] = entry
+                order.append(key)
+
+            if prize and prize not in entry["prizes"]:  # type: ignore[operator]
+                entry["prizes"].append(prize)  # type: ignore[union-attr]
+
+    kept_lines: list[str] = []
+    rows_with_url = 0
+    rows_with_prizes = 0
+
+    for key in order:
+        entry = submissions[key]
+        project = entry["project"]
+        track = entry["track"]
+        url = entry["url"]
+        prizes = sorted(entry["prizes"])  # type: ignore[arg-type]
+
+        if url:
+            rows_with_url += 1
+        if prizes:
+            rows_with_prizes += 1
+
+        prizes_field = "|".join(prizes)
+        kept_lines.append(
+            f"{project}, {track}, {PLACEHOLDER_TABLE}, {PLACEHOLDER_ROOM}, {url}, {prizes_field}"
+        )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("w", encoding="utf-8") as f:
@@ -137,10 +216,15 @@ def main() -> int:
         if url_column
         else "; no Devpost URL column found in CSV"
     )
+    prize_note = (
+        f"; {rows_with_prizes} with opt-in prize(s)"
+        if has_prize_column
+        else "; no Opt-In Prize column found in CSV"
+    )
     print(
-        f"Wrote {len(kept_lines)} teams to {args.output} "
-        f"(skipped {skipped_drafts} draft{'s' if skipped_drafts != 1 else ''} "
-        f"out of {total_rows} row{'s' if total_rows != 1 else ''}{url_note}).",
+        f"Wrote {len(kept_lines)} submission(s) to {args.output} "
+        f"(skipped {skipped_drafts} draft row{'s' if skipped_drafts != 1 else ''} "
+        f"out of {total_rows} row{'s' if total_rows != 1 else ''}{url_note}{prize_note}).",
         file=sys.stderr,
     )
     return 0

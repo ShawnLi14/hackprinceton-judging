@@ -33,6 +33,7 @@ function OrganizerNav() {
     { href: `/organizer/setup?event=${eventId}`, label: 'Setup', path: '/organizer/setup' },
     { href: `/organizer/dashboard?event=${eventId}`, label: 'Live Dashboard', path: '/organizer/dashboard' },
     { href: `/organizer/results?event=${eventId}`, label: 'Results', path: '/organizer/results' },
+    { href: `/organizer/log?event=${eventId}`, label: 'Log', path: '/organizer/log' },
   ];
 
   return (

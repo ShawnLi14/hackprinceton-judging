@@ -22,6 +22,51 @@
 const BASE_URL = process.argv[2] || 'http://localhost:3000';
 
 // ============================================
+// Realistic room layout (referenced by the "Realistic" scenario below)
+// ============================================
+// `capacity` is the number of *people* a room fits (used to distribute teams
+// proportionally). `floor` is a per-building grouping the assign RPC uses to
+// keep judging localized — judges shouldn't have to walk between buildings,
+// so each building gets its own floor group(s):
+//   1 = JRR basement (A-level)
+//   2 = JRR 1st floor (1xx)
+//   3 = JRR 2nd floor (2xx)
+//   4 = JRR 3rd floor (3xx)
+//   5 = LAS (A/B basement + 1st)
+//   6 = Robertson (0xx)
+// `number` is sequential because the schema requires INTEGER and only uses
+// it as a sort key for room proximity within a floor.
+const REALISTIC_ROOMS = [
+  { name: 'JRR A97',                       number:  1, floor: 1, capacity: 35 },
+  { name: 'JRR A98',                       number:  2, floor: 1, capacity: 35 },
+  { name: 'JRR 101',                       number:  3, floor: 2, capacity: 48 },
+  { name: 'JRR 198',                       number:  4, floor: 2, capacity: 35 },
+  { name: 'JRR 201',                       number:  5, floor: 3, capacity: 24 },
+  { name: 'JRR 217',                       number:  6, floor: 3, capacity: 40 },
+  { name: 'JRR 298',                       number:  7, floor: 3, capacity: 24 },
+  { name: 'JRR 301',                       number:  8, floor: 4, capacity: 18 },
+  { name: 'JRR 397',                       number:  9, floor: 4, capacity: 18 },
+  { name: 'JRR 399 (Ruehl Family Room)',   number: 10, floor: 4, capacity: 74 },
+  { name: 'LAS 144',                       number: 11, floor: 5, capacity: 28 },
+  { name: 'LAS A71',                       number: 12, floor: 5, capacity: 60 },
+  { name: 'LAS B60A',                      number: 13, floor: 5, capacity: 24 },
+  { name: 'LAS B60B',                      number: 14, floor: 5, capacity: 48 },
+  { name: 'LAS B60C',                      number: 15, floor: 5, capacity: 24 },
+  { name: 'Robertson 001',                 number: 16, floor: 6, capacity: 70 },
+  { name: 'Robertson 002',                 number: 17, floor: 6, capacity: 70 },
+  { name: 'Robertson 005',                 number: 18, floor: 6, capacity: 24 },
+  { name: 'Robertson 010',                 number: 19, floor: 6, capacity: 16 },
+  { name: 'Robertson 012',                 number: 20, floor: 6, capacity: 16 },
+  { name: 'Robertson 014',                 number: 21, floor: 6, capacity: 16 },
+  { name: 'Robertson 015',                 number: 22, floor: 6, capacity: 30 },
+  { name: 'Robertson 016',                 number: 23, floor: 6, capacity: 80 },
+  { name: 'Robertson 020',                 number: 24, floor: 6, capacity: 25 },
+  { name: 'Robertson 023',                 number: 25, floor: 6, capacity: 40 },
+  { name: 'Robertson 029',                 number: 26, floor: 6, capacity: 25 },
+  { name: 'Robertson 035',                 number: 27, floor: 6, capacity: 25 },
+];
+
+// ============================================
 // Scenarios
 // ============================================
 const SCENARIOS = [
@@ -140,6 +185,20 @@ const SCENARIOS = [
     target_judgings: 2,
     max_sets_per_judge: 6,
   },
+  {
+    // Real-world layout: 27 rooms across JRR / LAS / Robertson, sized by
+    // actual capacity. Teams are allocated proportional to room capacity
+    // (largest-remainder). Every team also gets 0-3 opt-in prizes so the
+    // results-page prize filter has meaningful data to chew on.
+    name: 'Realistic — JRR / LAS / Robertson',
+    teams: 150,
+    rooms: REALISTIC_ROOMS,
+    judges: 30,
+    set_size: 5,
+    target_judgings: 3,
+    max_sets_per_judge: 10,
+    generateTeams: (count, rooms) => generateRealisticTeamsText(count, rooms),
+  },
 ];
 
 // ============================================
@@ -150,6 +209,26 @@ const PROJECTS = [
   'Budget Planner', 'Eco Monitor', 'Music Generator', 'AR Navigator', 'Chat Platform',
 ];
 const TRACKS = ['Health', 'Education', 'Sustainability', 'Social Good', 'Finance'];
+
+// Realistic Devpost-style opt-in prize names. Each team independently opts
+// into 0-3 of these (a team has one track but many prizes — that asymmetry
+// is what the importer + results UI handle).
+const REALISTIC_PRIZES = [
+  'Best Use of Gemini API',
+  'Best AI-Powered App',
+  'Best Domain Name from GoDaddy Registry',
+  'AI Research and Alignment Environments',
+  'Best Use of K2 Think V2',
+  'Best Use of Knot API',
+  'AI & Tech for Clinical Trials by Regeneron',
+  'Best Hardware Hack',
+  'Most Creative Use of Anthropic API',
+  'Best Sustainability Hack',
+];
+const REALISTIC_TRACKS = [
+  'Health', 'Education', 'Sustainability', 'Social Good',
+  'Finance', 'Entertainment + Media', 'Business and Enterprise',
+];
 const JUDGE_FIRST = [
   'Alice', 'Bob', 'Carol', 'David', 'Emma', 'Frank', 'Grace', 'Henry',
   'Iris', 'James', 'Karen', 'Larry', 'Maria', 'Nathan', 'Olivia', 'Pat',
@@ -179,6 +258,51 @@ function generateTeamsText(count, rooms) {
     const room = rooms[(i - 1) % rooms.length];
     lines.push(`${project}, ${track}, ${i}, ${room.name}`);
   }
+  return lines.join('\n') + '\n';
+}
+
+// Distributes `count` teams across `rooms` proportional to each room's
+// `capacity`. Uses largest-remainder rounding so the sum is exactly `count`,
+// then assigns 0-3 random opt-in prizes per team. Emits the 6-field format
+// (project, track, number, room, devpost_url, prizes).
+function generateRealisticTeamsText(count, rooms) {
+  const totalCapacity = rooms.reduce((s, r) => s + r.capacity, 0);
+
+  // Largest-remainder allocation: floor() each share, then hand out the
+  // leftover seats to whichever rooms had the largest fractional remainder.
+  const exact = rooms.map(r => (count * r.capacity) / totalCapacity);
+  const floors = exact.map(x => Math.floor(x));
+  let remainder = count - floors.reduce((s, n) => s + n, 0);
+  const fracOrder = exact
+    .map((x, i) => ({ i, frac: x - Math.floor(x) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < remainder; k++) {
+    floors[fracOrder[k % fracOrder.length].i] += 1;
+  }
+  const perRoom = floors;
+
+  const lines = [
+    '# Project Name, Track, Team Number, Room Name, Devpost URL, Prize1|Prize2|...',
+  ];
+  let teamNum = 1;
+  for (let r = 0; r < rooms.length; r++) {
+    const room = rooms[r];
+    for (let j = 0; j < perRoom[r]; j++) {
+      const project = `${PROJECTS[Math.floor(Math.random() * PROJECTS.length)]} #${teamNum}`;
+      const track = REALISTIC_TRACKS[Math.floor(Math.random() * REALISTIC_TRACKS.length)];
+
+      // 0-3 distinct prizes, alphabetized so re-runs of the test produce
+      // stable diffs when nothing else changed.
+      const numPrizes = Math.floor(Math.random() * 4);
+      const shuffled = REALISTIC_PRIZES.slice().sort(() => Math.random() - 0.5);
+      const prizes = shuffled.slice(0, numPrizes).sort((a, b) => a.localeCompare(b));
+      const prizeField = prizes.join('|');
+
+      lines.push(`${project}, ${track}, ${teamNum}, ${room.name}, , ${prizeField}`);
+      teamNum += 1;
+    }
+  }
+
   return lines.join('\n') + '\n';
 }
 
@@ -415,7 +539,9 @@ async function runScenario(scenario) {
     });
 
     const roomsText = generateRoomsText(scenario.rooms);
-    const teamsText = generateTeamsText(scenario.teams, scenario.rooms);
+    const teamsText = scenario.generateTeams
+      ? scenario.generateTeams(scenario.teams, scenario.rooms)
+      : generateTeamsText(scenario.teams, scenario.rooms);
     const judgesText = generateJudgesText(scenario.judges);
 
     const roomsResult = await apiPost('/api/import', { event_id: event.id, type: 'rooms', data: roomsText });

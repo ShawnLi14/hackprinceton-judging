@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { submitJudgingSet } from '@/lib/assignment';
+import { supabase } from '@/lib/supabase';
+import { actorFromJudgeId, logEvent } from '@/lib/log';
 
 // POST /api/judges/submit
 // Body: {
@@ -78,19 +80,56 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const success = await submitJudgingSet(
-    judging_set_id,
-    normalized.map(e => ({
-      team_id: e.team_id,
-      rank: e.rank,
-      notes: e.notes,
-      is_absent: e.is_absent,
-    }))
-  );
+  // Look up judge + event for log attribution. Failure is non-fatal — the
+  // submit goes ahead regardless.
+  let eventId: string | null = null;
+  let actor = 'anonymous';
+  try {
+    const { data: setRow } = await supabase
+      .from('judging_sets')
+      .select('event_id, judge_id')
+      .eq('id', judging_set_id)
+      .single();
+    if (setRow) {
+      eventId = setRow.event_id;
+      actor = await actorFromJudgeId(setRow.judge_id);
+    }
+  } catch {
+    // ignore
+  }
+
+  const payload = normalized.map(e => ({
+    team_id: e.team_id,
+    rank: e.rank,
+    notes: e.notes,
+    is_absent: e.is_absent,
+  }));
+
+  const success = await submitJudgingSet(judging_set_id, payload);
 
   if (!success) {
+    await logEvent({
+      event_id: eventId,
+      actor,
+      action: 'set.submit_failed',
+      message: `${actor} failed to submit set`,
+      details: { judging_set_id, rankings: payload },
+    });
     return NextResponse.json({ error: 'Failed to submit ranks' }, { status: 500 });
   }
+
+  await logEvent({
+    event_id: eventId,
+    actor,
+    action: 'set.submitted',
+    message: `${actor} submitted ranks for ${payload.filter(p => !p.is_absent).length} of ${payload.length} team(s)`,
+    details: {
+      judging_set_id,
+      rankings: payload,
+      present_count: payload.filter(p => !p.is_absent).length,
+      absent_count: payload.filter(p => p.is_absent).length,
+    },
+  });
 
   return NextResponse.json({ success: true });
 }

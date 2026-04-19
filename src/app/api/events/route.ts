@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { actorOrganizer, logEvent } from '@/lib/log';
 
 const SITE_PASSWORD = process.env.SITE_PASSWORD || 'hehe1414';
 
@@ -53,6 +54,19 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  await logEvent({
+    event_id: data.id,
+    actor: actorOrganizer(),
+    action: 'event.created',
+    message: `Event "${data.name}" created`,
+    details: {
+      set_size: data.set_size,
+      target_judgings_per_team: data.target_judgings_per_team,
+      max_judging_minutes: data.max_judging_minutes,
+    },
+  });
+
   return NextResponse.json(data);
 }
 
@@ -73,6 +87,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
   }
 
+  const { data: before } = await supabase
+    .from('events')
+    .select('*')
+    .eq('id', eventId)
+    .single();
+
   const { data, error } = await supabase
     .from('events')
     .update(updates)
@@ -81,6 +101,29 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // Diff fields, redact admin_code value but record that it changed.
+  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  for (const k of Object.keys(updates)) {
+    const fromVal = (before as Record<string, unknown> | null)?.[k];
+    const toVal = (data as Record<string, unknown>)[k];
+    if (fromVal !== toVal) {
+      if (k === 'admin_code') {
+        changes[k] = { from: '[redacted]', to: '[redacted]' };
+      } else {
+        changes[k] = { from: fromVal, to: toVal };
+      }
+    }
+  }
+
+  await logEvent({
+    event_id: eventId,
+    actor: actorOrganizer(),
+    action: 'event.patched',
+    message: `Event "${data.name}" updated (${Object.keys(changes).join(', ') || 'no changes'})`,
+    details: { changes },
+  });
+
   return NextResponse.json(data);
 }
 
@@ -92,6 +135,22 @@ export async function DELETE(req: NextRequest) {
 
   const denied = checkPassword(password || undefined);
   if (denied) return denied;
+
+  const { data: before } = await supabase
+    .from('events')
+    .select('id, name')
+    .eq('id', eventId)
+    .single();
+
+  // Log BEFORE delete because cascade will null event_id on the log row
+  // (ON DELETE SET NULL), but the message still preserves what happened.
+  await logEvent({
+    event_id: eventId,
+    actor: actorOrganizer(),
+    action: 'event.deleted',
+    message: `Event "${before?.name || eventId}" deleted (cascades to all related data)`,
+    details: { event_id: eventId, name: before?.name },
+  });
 
   const { error } = await supabase.from('events').delete().eq('id', eventId);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

@@ -1,6 +1,12 @@
 -- ============================================
 -- HackPrinceton Judging App - Database Schema
 -- ============================================
+-- This file is the canonical full schema for fresh installs. The
+-- additive migrations 002_event_log.sql, 003_edit_completed_set.sql,
+-- and 004_abandon_judging_set.sql are mirrored at the bottom of this
+-- file (search for "Mirror of") so existing deployments can apply them
+-- incrementally while a fresh `supabase db reset` against this file
+-- gets everything in one shot.
 
 -- Events table: one row per hackathon event
 CREATE TABLE events (
@@ -37,6 +43,7 @@ CREATE TABLE teams (
   team_number TEXT NOT NULL,
   room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
   devpost_url TEXT,           -- optional link to a Devpost (or other) submission
+  opt_in_prizes TEXT[] NOT NULL DEFAULT '{}',  -- Devpost "Opt-In Prize" values; empty = no opt-ins
   times_judged INTEGER NOT NULL DEFAULT 0,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -45,6 +52,7 @@ CREATE TABLE teams (
 CREATE INDEX idx_teams_event ON teams(event_id);
 CREATE INDEX idx_teams_room ON teams(room_id);
 CREATE INDEX idx_teams_times_judged ON teams(event_id, times_judged);
+CREATE INDEX idx_teams_opt_in_prizes ON teams USING GIN (opt_in_prizes);
 
 -- Judges: people doing the judging
 CREATE TABLE judges (
@@ -228,6 +236,13 @@ BEGIN
   -- ON CONFLICT DO NOTHING + GET DIAGNOSTICS ensures no double-locking.
   -- All active teams on the chosen floor are candidates, ordered by
   -- times_judged ASC so under-target teams are prioritized first.
+  --
+  -- Tiebreaker: room_number + small random jitter. Without the jitter,
+  -- judges always sweep low-numbered rooms first, which causes everyone
+  -- to converge on the same teams (and leaves high-numbered rooms cold).
+  -- A jitter of ~3 means neighboring rooms can swap order while distant
+  -- rooms stay in their natural sequence — preserving locality without
+  -- being deterministic.
   FOR v_rec IN
     SELECT t.id AS tid
     FROM teams t
@@ -235,7 +250,7 @@ BEGIN
     WHERE t.event_id = p_event_id
       AND t.is_active = true
       AND r.floor = v_best_floor
-    ORDER BY t.times_judged ASC, r.room_number ASC
+    ORDER BY t.times_judged ASC, (r.room_number::float + random() * 3.0)
   LOOP
     EXIT WHEN v_order >= v_set_size;
 
@@ -360,3 +375,135 @@ ALTER PUBLICATION supabase_realtime ADD TABLE judging_set_teams;
 ALTER PUBLICATION supabase_realtime ADD TABLE team_locks;
 ALTER PUBLICATION supabase_realtime ADD TABLE judges;
 ALTER PUBLICATION supabase_realtime ADD TABLE teams;
+
+-- ============================================
+-- Mirror of 002_event_log.sql
+-- ============================================
+-- Append-only log of every consequential action during judging. Written
+-- from API route handlers via src/lib/log.ts so we can reconstruct what
+-- happened after the fact and tail it live from /organizer/log.
+
+CREATE TABLE IF NOT EXISTS event_log (
+  id        BIGSERIAL PRIMARY KEY,
+  ts        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  event_id  UUID REFERENCES events(id) ON DELETE CASCADE,
+  actor     TEXT,           -- 'JUDGE-007' | 'organizer' | 'system' | 'anonymous'
+  action    TEXT NOT NULL,  -- short verb-y string e.g. 'set.submitted'
+  message   TEXT,           -- one-line human-readable summary
+  details   JSONB           -- raw payload / response / error context
+);
+
+CREATE INDEX IF NOT EXISTS event_log_event_ts_idx ON event_log (event_id, ts DESC);
+CREATE INDEX IF NOT EXISTS event_log_ts_idx       ON event_log (ts DESC);
+CREATE INDEX IF NOT EXISTS event_log_action_idx   ON event_log (action, ts DESC);
+
+ALTER PUBLICATION supabase_realtime ADD TABLE event_log;
+
+-- ============================================
+-- Mirror of 003_edit_completed_set.sql
+-- ============================================
+-- Lets an organizer reorder ranks or flip is_absent for the rows of a
+-- completed set, transactionally adjusting `teams.times_judged` so the
+-- assignment algorithm and the results endpoint stay consistent.
+--
+-- The API route (PATCH /api/organizer/sets/[id]) is responsible for
+-- validating that the ranks of present teams form the contiguous
+-- sequence 1..K with no gaps or duplicates. This RPC enforces only the
+-- structural invariants the DB cares about (set is completed, every
+-- team in the payload belongs to the set) and the times_judged delta.
+
+CREATE OR REPLACE FUNCTION edit_completed_set(
+  p_set_id UUID,
+  p_rankings JSONB  -- array of {team_id, rank, is_absent}
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+  v_event_id   UUID;
+  v_status     TEXT;
+  v_ranking    JSONB;
+  v_team_id    UUID;
+  v_new_absent BOOLEAN;
+  v_new_rank   INTEGER;
+  v_was_absent BOOLEAN;
+BEGIN
+  SELECT event_id, status INTO v_event_id, v_status
+  FROM judging_sets
+  WHERE id = p_set_id;
+
+  IF v_event_id IS NULL THEN
+    RAISE EXCEPTION 'Set % does not exist', p_set_id;
+  END IF;
+  IF v_status <> 'completed' THEN
+    RAISE EXCEPTION 'Set % is not completed (status=%)', p_set_id, v_status;
+  END IF;
+
+  FOR v_ranking IN SELECT * FROM jsonb_array_elements(p_rankings) LOOP
+    v_team_id    := (v_ranking->>'team_id')::UUID;
+    v_new_absent := COALESCE((v_ranking->>'is_absent')::BOOLEAN, false);
+    v_new_rank   := NULLIF(v_ranking->>'rank', '')::INTEGER;
+
+    SELECT is_absent INTO v_was_absent
+    FROM judging_set_teams
+    WHERE judging_set_id = p_set_id AND team_id = v_team_id;
+
+    IF v_was_absent IS NULL THEN
+      RAISE EXCEPTION 'Team % is not part of set %', v_team_id, p_set_id;
+    END IF;
+
+    UPDATE judging_set_teams
+    SET rank      = CASE WHEN v_new_absent THEN NULL ELSE v_new_rank END,
+        is_absent = v_new_absent
+    WHERE judging_set_id = p_set_id AND team_id = v_team_id;
+
+    IF v_was_absent = true AND v_new_absent = false THEN
+      UPDATE teams SET times_judged = times_judged + 1 WHERE id = v_team_id;
+    ELSIF v_was_absent = false AND v_new_absent = true THEN
+      UPDATE teams SET times_judged = GREATEST(times_judged - 1, 0) WHERE id = v_team_id;
+    END IF;
+  END LOOP;
+
+  RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================
+-- Mirror of 004_abandon_judging_set.sql
+-- ============================================
+-- Force-abandon a judge's currently-active set (organizer override for
+-- when a judge has gone AWOL). Releases locks, marks the set expired,
+-- and sets the judge back to idle. Does NOT touch teams.times_judged
+-- (the judge never finished) and does NOT clear judge.current_room_id.
+
+CREATE OR REPLACE FUNCTION abandon_judging_set(p_set_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+  v_status   TEXT;
+  v_judge_id UUID;
+BEGIN
+  SELECT status, judge_id INTO v_status, v_judge_id
+  FROM judging_sets
+  WHERE id = p_set_id;
+
+  IF v_status IS NULL THEN
+    RAISE EXCEPTION 'Set % does not exist', p_set_id;
+  END IF;
+  IF v_status <> 'active' THEN
+    RAISE EXCEPTION 'Set % is not active (status=%)', p_set_id, v_status;
+  END IF;
+
+  UPDATE team_locks
+  SET released_at = now()
+  WHERE judging_set_id = p_set_id
+    AND released_at IS NULL;
+
+  UPDATE judging_sets
+  SET status = 'expired', completed_at = now()
+  WHERE id = p_set_id;
+
+  UPDATE judges
+  SET status = 'idle'
+  WHERE id = v_judge_id;
+
+  RETURN true;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

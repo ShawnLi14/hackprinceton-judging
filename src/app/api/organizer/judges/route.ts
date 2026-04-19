@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { assignGeneratedJudgeCodes } from '@/lib/judge-codes';
 import { reclaimActiveAssignmentsForJudge } from '@/lib/assignment';
 import { supabase } from '@/lib/supabase';
+import { actorOrganizer, logEvent } from '@/lib/log';
 
 // GET: list judges for an event with their active sets
 export async function GET(req: NextRequest) {
@@ -77,6 +78,15 @@ export async function POST(req: NextRequest) {
     .select();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  await logEvent({
+    event_id: eventId,
+    actor: actorOrganizer(),
+    action: 'judge.created',
+    message: `Created ${data?.length || 0} judge(s)`,
+    details: { judges: data?.map(j => ({ id: j.id, name: j.name, access_code: j.access_code })) },
+  });
+
   return NextResponse.json(data);
 }
 
@@ -84,6 +94,13 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const judgeId = req.nextUrl.searchParams.get('id');
   if (!judgeId) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+  // Snapshot judge for logging.
+  const { data: judgeBefore } = await supabase
+    .from('judges')
+    .select('id, name, access_code, event_id')
+    .eq('id', judgeId)
+    .single();
 
   const reclaimed = await reclaimActiveAssignmentsForJudge(judgeId);
   if (!reclaimed) {
@@ -96,5 +113,14 @@ export async function DELETE(req: NextRequest) {
     .eq('id', judgeId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  await logEvent({
+    event_id: judgeBefore?.event_id || null,
+    actor: actorOrganizer(),
+    action: 'judge.deactivated',
+    message: `Deactivated judge ${judgeBefore?.access_code || judgeBefore?.name || judgeId}`,
+    details: { judge_id: judgeId, judge: judgeBefore },
+  });
+
   return NextResponse.json({ success: true });
 }

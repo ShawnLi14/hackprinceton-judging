@@ -23,7 +23,19 @@ const projectTypes = [
 
 const tracks = ['Health', 'Education', 'Sustainability', 'Social Good', 'Finance'];
 
-const lines = ['# Project Name, Track, Table Number, Room Name'];
+// Sample opt-in prizes (mirrors Devpost-style "Opt-In Prize" values).
+// Each team independently opts into 0-3 of these. Teams have one track but
+// many prizes — that asymmetry is exactly what the importer/UI handles.
+const prizes = [
+  'Best Use of Gemini API',
+  'Best AI-Powered App',
+  'Best Domain Name from GoDaddy Registry',
+  'AI Research and Alignment Environments',
+  'Best Use of K2 Think V2',
+  'Best Use of Knot API',
+];
+
+const lines = ['# Project Name, Track, Table Number, Room Name, Devpost URL, Prize1|Prize2|...'];
 
 for (let i = 1; i <= 200; i++) {
   const project = `${projectTypes[Math.floor(Math.random() * projectTypes.length)]} #${i}`;
@@ -33,7 +45,16 @@ for (let i = 1; i <= 200; i++) {
   const tableInRoom = Math.floor((i - 1) / rooms.length) + 1;
   const tableNumber = `T${tableInRoom}`;
 
-  lines.push(`${project}, ${track}, ${tableNumber}, ${room}`);
+  // 0-3 distinct prizes, kept in a stable alphabetical order so re-runs
+  // don't churn the file just because Math.random shuffled.
+  const numPrizes = Math.floor(Math.random() * 4); // 0, 1, 2, or 3
+  const shuffled = prizes.slice().sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, numPrizes).sort((a, b) => a.localeCompare(b));
+  const prizeField = picked.join('|');
+
+  // Devpost URL stays empty for synthetic teams; field is still emitted so
+  // the line is unambiguously the 6-field format.
+  lines.push(`${project}, ${track}, ${tableNumber}, ${room}, , ${prizeField}`);
 }
 
 const fs = require('fs');

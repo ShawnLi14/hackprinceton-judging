@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { actorOrganizer, logEvent } from '@/lib/log';
 
 // GET: list teams for an event (with room info and lock status)
 export async function GET(req: NextRequest) {
@@ -35,6 +36,15 @@ export async function POST(req: NextRequest) {
     .select();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  await logEvent({
+    event_id: teams[0]?.event_id || null,
+    actor: actorOrganizer(),
+    action: 'team.created',
+    message: `Created ${data?.length || 0} team(s)`,
+    details: { count: data?.length || 0 },
+  });
+
   return NextResponse.json(data);
 }
 
@@ -43,7 +53,22 @@ export async function DELETE(req: NextRequest) {
   const teamId = req.nextUrl.searchParams.get('id');
   if (!teamId) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
+  const { data: before } = await supabase
+    .from('teams')
+    .select('id, project_name, team_number, event_id')
+    .eq('id', teamId)
+    .single();
+
   const { error } = await supabase.from('teams').delete().eq('id', teamId);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  await logEvent({
+    event_id: before?.event_id || null,
+    actor: actorOrganizer(),
+    action: 'team.deleted',
+    message: `Deleted team ${before?.project_name || `#${before?.team_number}` || teamId}`,
+    details: { team_id: teamId, team: before },
+  });
+
   return NextResponse.json({ success: true });
 }

@@ -1,201 +1,201 @@
-# Project Name, Track, Table Number, Room Name
-Water Reminder #1, Finance, T1, Friend 101
-Fitness Coach #2, Sustainability, T1, Friend 103
-AR Navigator #3, Health, T1, Friend 105
-Note Taker #4, Education, T1, Friend 108
-Virtual Tutor #5, Health, T1, Friend 110
-Study Buddy #6, Sustainability, T1, Friend 201
-Eco Monitor #7, Sustainability, T1, Friend 203
-Event Planner #8, Sustainability, T1, Friend 205
-Event Planner #9, Health, T1, Friend 206
-Mood Tracker #10, Social Good, T1, Sherrerd 301
-Music Generator #11, Health, T1, Sherrerd 303
-Music Generator #12, Social Good, T1, Sherrerd 305
-Sleep Analyzer #13, Sustainability, T2, Friend 101
-Habit Builder #14, Education, T2, Friend 103
-Event Planner #15, Finance, T2, Friend 105
-Code Reviewer #16, Sustainability, T2, Friend 108
-Music Generator #17, Health, T2, Friend 110
-Recipe AI #18, Finance, T2, Friend 201
-Note Taker #19, Social Good, T2, Friend 203
-Study Buddy #20, Finance, T2, Friend 205
-Water Reminder #21, Health, T2, Friend 206
-Mental Health App #22, Health, T2, Sherrerd 301
-Virtual Tutor #23, Finance, T2, Sherrerd 303
-Plant Care #24, Sustainability, T2, Sherrerd 305
-Volunteer Hub #25, Social Good, T3, Friend 101
-Budget Planner #26, Social Good, T3, Friend 103
-Lost & Found #27, Education, T3, Friend 105
-Habit Builder #28, Education, T3, Friend 108
-Pet Finder #29, Social Good, T3, Friend 110
-Safety Alert #30, Health, T3, Friend 201
-Virtual Tutor #31, Social Good, T3, Friend 203
-Donation Platform #32, Health, T3, Friend 205
-Mental Health App #33, Social Good, T3, Friend 206
-Skill Swap #34, Sustainability, T3, Sherrerd 301
-Transit App #35, Social Good, T3, Sherrerd 303
-Safety Alert #36, Social Good, T3, Sherrerd 305
-Mental Health App #37, Finance, T4, Friend 101
-Study Buddy #38, Social Good, T4, Friend 103
-Chat Platform #39, Finance, T4, Friend 105
-Habit Builder #40, Education, T4, Friend 108
-Lost & Found #41, Social Good, T4, Friend 110
-Waste Sorter #42, Education, T4, Friend 201
-Skill Swap #43, Sustainability, T4, Friend 203
-Donation Platform #44, Health, T4, Friend 205
-AI Assistant #45, Education, T4, Friend 206
-Donation Platform #46, Social Good, T4, Sherrerd 301
-Lost & Found #47, Social Good, T4, Sherrerd 303
-Smart Calendar #48, Sustainability, T4, Sherrerd 305
-Plant Care #49, Health, T5, Friend 101
-Language Tutor #50, Finance, T5, Friend 103
-Fitness Coach #51, Social Good, T5, Friend 105
-Job Matcher #52, Social Good, T5, Friend 108
-Code Reviewer #53, Sustainability, T5, Friend 110
-Job Matcher #54, Sustainability, T5, Friend 201
-Budget Planner #55, Sustainability, T5, Friend 203
-Language Tutor #56, Health, T5, Friend 205
-Weather Alert #57, Education, T5, Friend 206
-Donation Platform #58, Finance, T5, Sherrerd 301
-AI Assistant #59, Education, T5, Sherrerd 303
-Language Tutor #60, Social Good, T5, Sherrerd 305
-Music Generator #61, Sustainability, T6, Friend 101
-Safety Alert #62, Social Good, T6, Friend 103
-Budget Planner #63, Education, T6, Friend 105
-Skill Swap #64, Health, T6, Friend 108
-Water Reminder #65, Finance, T6, Friend 110
-Food Finder #66, Social Good, T6, Friend 201
-Price Tracker #67, Education, T6, Friend 203
-Fitness Coach #68, Sustainability, T6, Friend 205
-Music Generator #69, Health, T6, Friend 206
-Donation Platform #70, Sustainability, T6, Sherrerd 301
-Weather Alert #71, Social Good, T6, Sherrerd 303
-Music Generator #72, Education, T6, Sherrerd 305
-Language Tutor #73, Finance, T7, Friend 101
-Price Tracker #74, Education, T7, Friend 103
-Chat Platform #75, Social Good, T7, Friend 105
-Volunteer Hub #76, Health, T7, Friend 108
-Study Buddy #77, Education, T7, Friend 110
-Eco Monitor #78, Sustainability, T7, Friend 201
-Weather Alert #79, Social Good, T7, Friend 203
-Job Matcher #80, Social Good, T7, Friend 205
-Water Reminder #81, Sustainability, T7, Friend 206
-Job Matcher #82, Sustainability, T7, Sherrerd 301
-Parking Finder #83, Social Good, T7, Sherrerd 303
-Health Tracker #84, Finance, T7, Sherrerd 305
-Carbon Calculator #85, Social Good, T8, Friend 101
-AI Assistant #86, Education, T8, Friend 103
-Chat Platform #87, Sustainability, T8, Friend 105
-Skill Swap #88, Sustainability, T8, Friend 108
-Donation Platform #89, Health, T8, Friend 110
-Budget Planner #90, Health, T8, Friend 201
-Volunteer Hub #91, Education, T8, Friend 203
-Parking Finder #92, Finance, T8, Friend 205
-Price Tracker #93, Finance, T8, Friend 206
-Job Matcher #94, Finance, T8, Sherrerd 301
-Accessibility Tool #95, Social Good, T8, Sherrerd 303
-Commute Optimizer #96, Health, T8, Sherrerd 305
-Chat Platform #97, Education, T9, Friend 101
-Waste Sorter #98, Sustainability, T9, Friend 103
-Waste Sorter #99, Health, T9, Friend 105
-Recipe AI #100, Education, T9, Friend 108
-Commute Optimizer #101, Health, T9, Friend 110
-AI Assistant #102, Social Good, T9, Friend 201
-Eco Monitor #103, Social Good, T9, Friend 203
-Budget Planner #104, Finance, T9, Friend 205
-Donation Platform #105, Sustainability, T9, Friend 206
-AR Navigator #106, Health, T9, Sherrerd 301
-Study Buddy #107, Education, T9, Sherrerd 303
-Food Finder #108, Sustainability, T9, Sherrerd 305
-Code Reviewer #109, Education, T10, Friend 101
-Plant Care #110, Education, T10, Friend 103
-Mood Tracker #111, Sustainability, T10, Friend 105
-Eco Monitor #112, Health, T10, Friend 108
-Study Buddy #113, Health, T10, Friend 110
-Food Finder #114, Health, T10, Friend 201
-Volunteer Hub #115, Sustainability, T10, Friend 203
-AI Assistant #116, Education, T10, Friend 205
-Recipe AI #117, Finance, T10, Friend 206
-Volunteer Hub #118, Education, T10, Sherrerd 301
-Lost & Found #119, Sustainability, T10, Sherrerd 303
-Mood Tracker #120, Social Good, T10, Sherrerd 305
-Lost & Found #121, Social Good, T11, Friend 101
-Waste Sorter #122, Finance, T11, Friend 103
-Study Buddy #123, Social Good, T11, Friend 105
-Accessibility Tool #124, Health, T11, Friend 108
-Commute Optimizer #125, Education, T11, Friend 110
-Price Tracker #126, Health, T11, Friend 201
-Smart Calendar #127, Finance, T11, Friend 203
-Plant Care #128, Social Good, T11, Friend 205
-Water Reminder #129, Finance, T11, Friend 206
-Music Generator #130, Social Good, T11, Sherrerd 301
-Accessibility Tool #131, Health, T11, Sherrerd 303
-Sleep Analyzer #132, Health, T11, Sherrerd 305
-Event Planner #133, Social Good, T12, Friend 101
-Language Tutor #134, Social Good, T12, Friend 103
-Price Tracker #135, Education, T12, Friend 105
-Study Buddy #136, Health, T12, Friend 108
-Waste Sorter #137, Sustainability, T12, Friend 110
-Mental Health App #138, Education, T12, Friend 201
-Chat Platform #139, Health, T12, Friend 203
-Commute Optimizer #140, Health, T12, Friend 205
-Pet Finder #141, Education, T12, Friend 206
-Transit App #142, Social Good, T12, Sherrerd 301
-Job Matcher #143, Health, T12, Sherrerd 303
-Skill Swap #144, Health, T12, Sherrerd 305
-Commute Optimizer #145, Health, T13, Friend 101
-Weather Alert #146, Finance, T13, Friend 103
-Safety Alert #147, Social Good, T13, Friend 105
-Music Generator #148, Finance, T13, Friend 108
-Donation Platform #149, Education, T13, Friend 110
-Note Taker #150, Health, T13, Friend 201
-Budget Planner #151, Finance, T13, Friend 203
-Plant Care #152, Education, T13, Friend 205
-Code Reviewer #153, Education, T13, Friend 206
-Meal Prep #154, Social Good, T13, Sherrerd 301
-Recipe AI #155, Finance, T13, Sherrerd 303
-Pet Finder #156, Finance, T13, Sherrerd 305
-Eco Monitor #157, Sustainability, T14, Friend 101
-Smart Calendar #158, Sustainability, T14, Friend 103
-Transit App #159, Education, T14, Friend 105
-Plant Care #160, Social Good, T14, Friend 108
-Health Tracker #161, Social Good, T14, Friend 110
-Skill Swap #162, Finance, T14, Friend 201
-Transit App #163, Sustainability, T14, Friend 203
-Volunteer Hub #164, Social Good, T14, Friend 205
-Food Finder #165, Finance, T14, Friend 206
-Study Buddy #166, Education, T14, Sherrerd 301
-Code Reviewer #167, Education, T14, Sherrerd 303
-Habit Builder #168, Education, T14, Sherrerd 305
-Food Finder #169, Health, T15, Friend 101
-Price Tracker #170, Social Good, T15, Friend 103
-Code Reviewer #171, Finance, T15, Friend 105
-Music Generator #172, Finance, T15, Friend 108
-Chat Platform #173, Sustainability, T15, Friend 110
-Food Finder #174, Sustainability, T15, Friend 201
-Music Generator #175, Finance, T15, Friend 203
-Parking Finder #176, Education, T15, Friend 205
-Music Generator #177, Health, T15, Friend 206
-Eco Monitor #178, Sustainability, T15, Sherrerd 301
-Virtual Tutor #179, Sustainability, T15, Sherrerd 303
-Weather Alert #180, Finance, T15, Sherrerd 305
-Parking Finder #181, Health, T16, Friend 101
-Event Planner #182, Sustainability, T16, Friend 103
-Donation Platform #183, Finance, T16, Friend 105
-Weather Alert #184, Finance, T16, Friend 108
-Meal Prep #185, Health, T16, Friend 110
-Code Reviewer #186, Education, T16, Friend 201
-Price Tracker #187, Finance, T16, Friend 203
-Health Tracker #188, Sustainability, T16, Friend 205
-Mood Tracker #189, Sustainability, T16, Friend 206
-Mental Health App #190, Sustainability, T16, Sherrerd 301
-Language Tutor #191, Social Good, T16, Sherrerd 303
-Price Tracker #192, Sustainability, T16, Sherrerd 305
-Health Tracker #193, Finance, T17, Friend 101
-Water Reminder #194, Sustainability, T17, Friend 103
-Sleep Analyzer #195, Sustainability, T17, Friend 105
-Virtual Tutor #196, Social Good, T17, Friend 108
-Study Buddy #197, Finance, T17, Friend 110
-Transit App #198, Finance, T17, Friend 201
-Sleep Analyzer #199, Health, T17, Friend 203
-Mood Tracker #200, Education, T17, Friend 205
+# Project Name, Track, Table Number, Room Name, Devpost URL, Prize1|Prize2|...
+Health Tracker #1, Education, T1, Friend 101, , Best Use of K2 Think V2|Best Use of Knot API
+Lost & Found #2, Finance, T1, Friend 103, , Best AI-Powered App|Best Domain Name from GoDaddy Registry|Best Use of Gemini API
+AI Assistant #3, Social Good, T1, Friend 105, , Best Use of Knot API
+Donation Platform #4, Sustainability, T1, Friend 108, , AI Research and Alignment Environments|Best Use of Gemini API|Best Use of Knot API
+Virtual Tutor #5, Finance, T1, Friend 110, , AI Research and Alignment Environments|Best AI-Powered App|Best Domain Name from GoDaddy Registry
+Language Tutor #6, Social Good, T1, Friend 201, , Best Use of Gemini API
+Language Tutor #7, Health, T1, Friend 203, , Best AI-Powered App|Best Use of Gemini API|Best Use of Knot API
+Mood Tracker #8, Health, T1, Friend 205, , 
+Music Generator #9, Finance, T1, Friend 206, , AI Research and Alignment Environments|Best Use of Gemini API
+Music Generator #10, Health, T1, Sherrerd 301, , 
+Water Reminder #11, Social Good, T1, Sherrerd 303, , AI Research and Alignment Environments|Best Use of Gemini API|Best Use of K2 Think V2
+Eco Monitor #12, Sustainability, T1, Sherrerd 305, , 
+Water Reminder #13, Sustainability, T2, Friend 101, , AI Research and Alignment Environments|Best Domain Name from GoDaddy Registry|Best Use of K2 Think V2
+Weather Alert #14, Health, T2, Friend 103, , 
+Pet Finder #15, Health, T2, Friend 105, , Best Use of Gemini API
+Chat Platform #16, Sustainability, T2, Friend 108, , AI Research and Alignment Environments|Best Use of Knot API
+Donation Platform #17, Finance, T2, Friend 110, , 
+Job Matcher #18, Education, T2, Friend 201, , Best Use of Knot API
+Habit Builder #19, Education, T2, Friend 203, , AI Research and Alignment Environments
+Budget Planner #20, Social Good, T2, Friend 205, , AI Research and Alignment Environments|Best Use of K2 Think V2|Best Use of Knot API
+Waste Sorter #21, Education, T2, Friend 206, , AI Research and Alignment Environments|Best Use of Knot API
+Note Taker #22, Finance, T2, Sherrerd 301, , 
+Parking Finder #23, Finance, T2, Sherrerd 303, , Best AI-Powered App|Best Use of Gemini API|Best Use of Knot API
+Lost & Found #24, Health, T2, Sherrerd 305, , 
+Mood Tracker #25, Social Good, T3, Friend 101, , Best Domain Name from GoDaddy Registry
+AI Assistant #26, Social Good, T3, Friend 103, , Best AI-Powered App|Best Use of Gemini API
+Note Taker #27, Finance, T3, Friend 105, , Best Domain Name from GoDaddy Registry|Best Use of Gemini API
+Donation Platform #28, Education, T3, Friend 108, , Best Use of Gemini API
+Habit Builder #29, Education, T3, Friend 110, , Best Use of Gemini API
+Weather Alert #30, Social Good, T3, Friend 201, , Best Use of Gemini API
+Virtual Tutor #31, Sustainability, T3, Friend 203, , 
+Food Finder #32, Social Good, T3, Friend 205, , Best Use of Gemini API
+Skill Swap #33, Finance, T3, Friend 206, , 
+Plant Care #34, Sustainability, T3, Sherrerd 301, , Best Domain Name from GoDaddy Registry
+Volunteer Hub #35, Social Good, T3, Sherrerd 303, , AI Research and Alignment Environments|Best Use of Gemini API
+Eco Monitor #36, Sustainability, T3, Sherrerd 305, , 
+Price Tracker #37, Sustainability, T4, Friend 101, , AI Research and Alignment Environments|Best Domain Name from GoDaddy Registry|Best Use of Knot API
+Eco Monitor #38, Health, T4, Friend 103, , 
+Meal Prep #39, Health, T4, Friend 105, , 
+AR Navigator #40, Social Good, T4, Friend 108, , Best AI-Powered App|Best Domain Name from GoDaddy Registry
+AR Navigator #41, Health, T4, Friend 110, , 
+Skill Swap #42, Finance, T4, Friend 201, , AI Research and Alignment Environments|Best Use of K2 Think V2
+Waste Sorter #43, Health, T4, Friend 203, , AI Research and Alignment Environments
+Reading List #44, Finance, T4, Friend 205, , Best Use of K2 Think V2
+Code Reviewer #45, Health, T4, Friend 206, , AI Research and Alignment Environments|Best Use of Gemini API|Best Use of Knot API
+Meal Prep #46, Sustainability, T4, Sherrerd 301, , AI Research and Alignment Environments|Best Use of K2 Think V2|Best Use of Knot API
+Carbon Calculator #47, Health, T4, Sherrerd 303, , 
+Music Generator #48, Social Good, T4, Sherrerd 305, , 
+Parking Finder #49, Social Good, T5, Friend 101, , AI Research and Alignment Environments|Best AI-Powered App|Best Use of K2 Think V2
+Safety Alert #50, Social Good, T5, Friend 103, , Best Use of K2 Think V2
+Donation Platform #51, Finance, T5, Friend 105, , 
+Health Tracker #52, Education, T5, Friend 108, , 
+Job Matcher #53, Sustainability, T5, Friend 110, , Best AI-Powered App|Best Domain Name from GoDaddy Registry|Best Use of Knot API
+Safety Alert #54, Finance, T5, Friend 201, , Best AI-Powered App
+Transit App #55, Social Good, T5, Friend 203, , Best Domain Name from GoDaddy Registry|Best Use of Gemini API
+Lost & Found #56, Social Good, T5, Friend 205, , 
+Chat Platform #57, Finance, T5, Friend 206, , Best AI-Powered App|Best Use of Knot API
+Event Planner #58, Finance, T5, Sherrerd 301, , AI Research and Alignment Environments
+Mood Tracker #59, Social Good, T5, Sherrerd 303, , 
+Health Tracker #60, Finance, T5, Sherrerd 305, , Best Use of Gemini API
+Reading List #61, Social Good, T6, Friend 101, , 
+Commute Optimizer #62, Social Good, T6, Friend 103, , Best Domain Name from GoDaddy Registry|Best Use of Knot API
+Price Tracker #63, Social Good, T6, Friend 105, , 
+Skill Swap #64, Sustainability, T6, Friend 108, , AI Research and Alignment Environments|Best AI-Powered App|Best Domain Name from GoDaddy Registry
+Job Matcher #65, Health, T6, Friend 110, , Best Use of K2 Think V2
+Recipe AI #66, Finance, T6, Friend 201, , Best Use of Knot API
+Code Reviewer #67, Finance, T6, Friend 203, , Best AI-Powered App|Best Domain Name from GoDaddy Registry
+Event Planner #68, Sustainability, T6, Friend 205, , 
+Accessibility Tool #69, Sustainability, T6, Friend 206, , Best Use of Gemini API
+Food Finder #70, Social Good, T6, Sherrerd 301, , AI Research and Alignment Environments|Best Use of Gemini API|Best Use of Knot API
+Language Tutor #71, Health, T6, Sherrerd 303, , Best AI-Powered App|Best Domain Name from GoDaddy Registry
+Water Reminder #72, Social Good, T6, Sherrerd 305, , 
+Mood Tracker #73, Education, T7, Friend 101, , AI Research and Alignment Environments|Best Use of Gemini API|Best Use of Knot API
+Note Taker #74, Social Good, T7, Friend 103, , Best Domain Name from GoDaddy Registry
+Mood Tracker #75, Health, T7, Friend 105, , 
+Code Reviewer #76, Education, T7, Friend 108, , AI Research and Alignment Environments
+Eco Monitor #77, Social Good, T7, Friend 110, , 
+Mood Tracker #78, Finance, T7, Friend 201, , AI Research and Alignment Environments|Best Domain Name from GoDaddy Registry|Best Use of Gemini API
+AI Assistant #79, Education, T7, Friend 203, , Best Use of Gemini API
+Code Reviewer #80, Health, T7, Friend 205, , Best AI-Powered App
+Commute Optimizer #81, Education, T7, Friend 206, , Best Domain Name from GoDaddy Registry
+Mood Tracker #82, Sustainability, T7, Sherrerd 301, , Best AI-Powered App|Best Use of Gemini API|Best Use of Knot API
+Volunteer Hub #83, Sustainability, T7, Sherrerd 303, , AI Research and Alignment Environments
+Volunteer Hub #84, Sustainability, T7, Sherrerd 305, , AI Research and Alignment Environments|Best AI-Powered App|Best Domain Name from GoDaddy Registry
+Sleep Analyzer #85, Finance, T8, Friend 101, , Best AI-Powered App|Best Domain Name from GoDaddy Registry|Best Use of Knot API
+Habit Builder #86, Sustainability, T8, Friend 103, , Best AI-Powered App|Best Use of Gemini API
+Waste Sorter #87, Education, T8, Friend 105, , Best Use of Knot API
+Music Generator #88, Finance, T8, Friend 108, , AI Research and Alignment Environments|Best AI-Powered App
+Pet Finder #89, Finance, T8, Friend 110, , Best Use of Gemini API
+Code Reviewer #90, Social Good, T8, Friend 201, , Best AI-Powered App|Best Domain Name from GoDaddy Registry|Best Use of Gemini API
+Carbon Calculator #91, Health, T8, Friend 203, , Best AI-Powered App
+Transit App #92, Health, T8, Friend 205, , Best Domain Name from GoDaddy Registry|Best Use of Knot API
+Meal Prep #93, Health, T8, Friend 206, , Best Use of K2 Think V2|Best Use of Knot API
+Language Tutor #94, Health, T8, Sherrerd 301, , 
+Budget Planner #95, Sustainability, T8, Sherrerd 303, , 
+Fitness Coach #96, Education, T8, Sherrerd 305, , Best Domain Name from GoDaddy Registry|Best Use of Knot API
+Donation Platform #97, Education, T9, Friend 101, , 
+Price Tracker #98, Education, T9, Friend 103, , Best AI-Powered App|Best Use of K2 Think V2
+Note Taker #99, Health, T9, Friend 105, , Best AI-Powered App|Best Use of Gemini API
+AI Assistant #100, Education, T9, Friend 108, , 
+Budget Planner #101, Health, T9, Friend 110, , Best Use of Gemini API|Best Use of Knot API
+Price Tracker #102, Sustainability, T9, Friend 201, , 
+Weather Alert #103, Finance, T9, Friend 203, , Best Use of Gemini API|Best Use of Knot API
+Reading List #104, Education, T9, Friend 205, , AI Research and Alignment Environments|Best AI-Powered App|Best Use of K2 Think V2
+Plant Care #105, Sustainability, T9, Friend 206, , AI Research and Alignment Environments
+Safety Alert #106, Health, T9, Sherrerd 301, , 
+Commute Optimizer #107, Health, T9, Sherrerd 303, , Best Use of Gemini API
+Water Reminder #108, Education, T9, Sherrerd 305, , 
+Note Taker #109, Sustainability, T10, Friend 101, , Best Use of Gemini API|Best Use of K2 Think V2|Best Use of Knot API
+Safety Alert #110, Social Good, T10, Friend 103, , 
+Weather Alert #111, Health, T10, Friend 105, , AI Research and Alignment Environments|Best AI-Powered App|Best Use of Gemini API
+AR Navigator #112, Sustainability, T10, Friend 108, , Best Use of K2 Think V2|Best Use of Knot API
+Eco Monitor #113, Finance, T10, Friend 110, , 
+Volunteer Hub #114, Social Good, T10, Friend 201, , AI Research and Alignment Environments|Best Use of K2 Think V2
+Donation Platform #115, Health, T10, Friend 203, , Best Use of Gemini API|Best Use of Knot API
+Water Reminder #116, Finance, T10, Friend 205, , 
+Language Tutor #117, Health, T10, Friend 206, , Best Use of Gemini API|Best Use of K2 Think V2
+Reading List #118, Sustainability, T10, Sherrerd 301, , Best Use of K2 Think V2
+AI Assistant #119, Sustainability, T10, Sherrerd 303, , Best AI-Powered App|Best Use of Gemini API
+Smart Calendar #120, Finance, T10, Sherrerd 305, , Best AI-Powered App|Best Use of Gemini API
+Eco Monitor #121, Finance, T11, Friend 101, , Best Domain Name from GoDaddy Registry
+Parking Finder #122, Sustainability, T11, Friend 103, , 
+Reading List #123, Education, T11, Friend 105, , AI Research and Alignment Environments|Best Use of K2 Think V2|Best Use of Knot API
+Price Tracker #124, Sustainability, T11, Friend 108, , Best Use of K2 Think V2
+Code Reviewer #125, Education, T11, Friend 110, , 
+Meal Prep #126, Finance, T11, Friend 201, , Best AI-Powered App
+Smart Calendar #127, Social Good, T11, Friend 203, , 
+Donation Platform #128, Education, T11, Friend 205, , 
+Plant Care #129, Health, T11, Friend 206, , Best Use of Gemini API
+AI Assistant #130, Social Good, T11, Sherrerd 301, , 
+AR Navigator #131, Social Good, T11, Sherrerd 303, , 
+Study Buddy #132, Social Good, T11, Sherrerd 305, , AI Research and Alignment Environments|Best AI-Powered App|Best Use of Gemini API
+Food Finder #133, Sustainability, T12, Friend 101, , 
+Health Tracker #134, Social Good, T12, Friend 103, , Best Use of K2 Think V2|Best Use of Knot API
+Carbon Calculator #135, Sustainability, T12, Friend 105, , 
+Waste Sorter #136, Education, T12, Friend 108, , 
+Skill Swap #137, Finance, T12, Friend 110, , Best Domain Name from GoDaddy Registry|Best Use of Gemini API|Best Use of K2 Think V2
+Reading List #138, Education, T12, Friend 201, , 
+Note Taker #139, Health, T12, Friend 203, , AI Research and Alignment Environments
+Music Generator #140, Sustainability, T12, Friend 205, , 
+Commute Optimizer #141, Health, T12, Friend 206, , Best AI-Powered App|Best Use of Gemini API
+Waste Sorter #142, Sustainability, T12, Sherrerd 301, , 
+Plant Care #143, Education, T12, Sherrerd 303, , 
+Eco Monitor #144, Finance, T12, Sherrerd 305, , Best Use of Knot API
+Pet Finder #145, Social Good, T13, Friend 101, , Best Use of Gemini API
+AI Assistant #146, Health, T13, Friend 103, , Best AI-Powered App|Best Use of Gemini API|Best Use of K2 Think V2
+Health Tracker #147, Sustainability, T13, Friend 105, , Best AI-Powered App|Best Domain Name from GoDaddy Registry|Best Use of Gemini API
+Food Finder #148, Finance, T13, Friend 108, , AI Research and Alignment Environments|Best Use of Gemini API
+Habit Builder #149, Sustainability, T13, Friend 110, , 
+Job Matcher #150, Finance, T13, Friend 201, , 
+Event Planner #151, Finance, T13, Friend 203, , 
+Health Tracker #152, Education, T13, Friend 205, , Best AI-Powered App|Best Domain Name from GoDaddy Registry
+Mental Health App #153, Sustainability, T13, Friend 206, , 
+Carbon Calculator #154, Social Good, T13, Sherrerd 301, , AI Research and Alignment Environments|Best Use of Knot API
+Eco Monitor #155, Health, T13, Sherrerd 303, , 
+Recipe AI #156, Social Good, T13, Sherrerd 305, , 
+Virtual Tutor #157, Sustainability, T14, Friend 101, , Best AI-Powered App|Best Use of Gemini API|Best Use of Knot API
+Health Tracker #158, Education, T14, Friend 103, , Best AI-Powered App|Best Use of K2 Think V2|Best Use of Knot API
+Event Planner #159, Finance, T14, Friend 105, , 
+Transit App #160, Sustainability, T14, Friend 108, , AI Research and Alignment Environments
+Budget Planner #161, Finance, T14, Friend 110, , Best AI-Powered App|Best Use of Gemini API|Best Use of Knot API
+Event Planner #162, Finance, T14, Friend 201, , Best Domain Name from GoDaddy Registry|Best Use of Gemini API
+Food Finder #163, Social Good, T14, Friend 203, , Best AI-Powered App
+Plant Care #164, Health, T14, Friend 205, , Best Domain Name from GoDaddy Registry|Best Use of K2 Think V2
+Reading List #165, Education, T14, Friend 206, , 
+Note Taker #166, Education, T14, Sherrerd 301, , AI Research and Alignment Environments|Best Use of Knot API
+Meal Prep #167, Finance, T14, Sherrerd 303, , Best Use of K2 Think V2
+Waste Sorter #168, Social Good, T14, Sherrerd 305, , Best Use of Gemini API
+Study Buddy #169, Sustainability, T15, Friend 101, , AI Research and Alignment Environments
+Mood Tracker #170, Finance, T15, Friend 103, , AI Research and Alignment Environments|Best AI-Powered App|Best Use of Gemini API
+Lost & Found #171, Sustainability, T15, Friend 105, , 
+Study Buddy #172, Social Good, T15, Friend 108, , AI Research and Alignment Environments|Best AI-Powered App|Best Domain Name from GoDaddy Registry
+AI Assistant #173, Health, T15, Friend 110, , Best AI-Powered App|Best Use of Gemini API
+Smart Calendar #174, Social Good, T15, Friend 201, , 
+Meal Prep #175, Health, T15, Friend 203, , Best AI-Powered App|Best Use of Gemini API|Best Use of Knot API
+Event Planner #176, Social Good, T15, Friend 205, , 
+Eco Monitor #177, Health, T15, Friend 206, , AI Research and Alignment Environments|Best AI-Powered App|Best Use of Knot API
+Recipe AI #178, Finance, T15, Sherrerd 301, , AI Research and Alignment Environments
+Carbon Calculator #179, Education, T15, Sherrerd 303, , Best AI-Powered App|Best Use of Gemini API|Best Use of Knot API
+Music Generator #180, Finance, T15, Sherrerd 305, , AI Research and Alignment Environments
+Weather Alert #181, Social Good, T16, Friend 101, , AI Research and Alignment Environments|Best Use of K2 Think V2|Best Use of Knot API
+AR Navigator #182, Health, T16, Friend 103, , 
+Skill Swap #183, Finance, T16, Friend 105, , AI Research and Alignment Environments|Best Domain Name from GoDaddy Registry
+Study Buddy #184, Finance, T16, Friend 108, , AI Research and Alignment Environments|Best Domain Name from GoDaddy Registry
+Note Taker #185, Education, T16, Friend 110, , 
+Skill Swap #186, Education, T16, Friend 201, , AI Research and Alignment Environments|Best Use of Gemini API|Best Use of Knot API
+Mood Tracker #187, Health, T16, Friend 203, , AI Research and Alignment Environments|Best AI-Powered App|Best Use of Gemini API
+Transit App #188, Health, T16, Friend 205, , Best Use of Gemini API
+Volunteer Hub #189, Social Good, T16, Friend 206, , Best Use of Gemini API
+Event Planner #190, Sustainability, T16, Sherrerd 301, , AI Research and Alignment Environments|Best Use of Gemini API|Best Use of K2 Think V2
+Mental Health App #191, Health, T16, Sherrerd 303, , Best Domain Name from GoDaddy Registry|Best Use of Knot API
+Donation Platform #192, Sustainability, T16, Sherrerd 305, , 
+Pet Finder #193, Social Good, T17, Friend 101, , Best AI-Powered App|Best Domain Name from GoDaddy Registry|Best Use of Knot API
+Meal Prep #194, Finance, T17, Friend 103, , Best Use of Gemini API
+Note Taker #195, Sustainability, T17, Friend 105, , Best AI-Powered App|Best Domain Name from GoDaddy Registry|Best Use of Knot API
+Lost & Found #196, Education, T17, Friend 108, , AI Research and Alignment Environments
+Event Planner #197, Social Good, T17, Friend 110, , Best AI-Powered App|Best Use of Gemini API
+Carbon Calculator #198, Social Good, T17, Friend 201, , Best AI-Powered App|Best Use of Gemini API|Best Use of Knot API
+Mental Health App #199, Education, T17, Friend 203, , Best Use of Knot API
+Weather Alert #200, Health, T17, Friend 205, , 

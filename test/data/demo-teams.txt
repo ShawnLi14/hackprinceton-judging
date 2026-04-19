@@ -1,37 +1,37 @@
-# Project Name, Track, Team Number, Room Name
+# Project Name, Track, Table Number, Room Name, Devpost URL, Prize1|Prize2|...
 # Floor 1 - Friend 101 (5 teams)
-Skill Swap, Education, 1, Friend 101
-Transit App, Sustainability, 2, Friend 101
-Reading List, Education, 3, Friend 101
-Smart Calendar, Finance, 4, Friend 101
-Meal Prep, Health, 5, Friend 101
+Skill Swap, Education, 1, Friend 101, , Best AI-Powered App
+Transit App, Sustainability, 2, Friend 101, , Best Use of Gemini API|Best Use of Knot API
+Reading List, Education, 3, Friend 101, , 
+Smart Calendar, Finance, 4, Friend 101, , Best Use of Knot API
+Meal Prep, Health, 5, Friend 101, , Best AI-Powered App|Best Use of K2 Think V2
 # Floor 1 - Friend 103 (5 teams)
-Lost & Found, Social Good, 6, Friend 103
-Food Finder, Health, 7, Friend 103
-Parking Finder, Sustainability, 8, Friend 103
-Eco Monitor, Sustainability, 9, Friend 103
-Skill Swap (B), Education, 10, Friend 103
+Lost & Found, Social Good, 6, Friend 103, , Best Use of Gemini API
+Food Finder, Health, 7, Friend 103, , 
+Parking Finder, Sustainability, 8, Friend 103, , Best Use of Knot API
+Eco Monitor, Sustainability, 9, Friend 103, , Best AI-Powered App|Best Use of Gemini API|Best Use of K2 Think V2
+Skill Swap (B), Education, 10, Friend 103, , 
 # Floor 2 - Friend 201 (5 teams)
-AI Assistant, Health, 11, Friend 201
-Parking Finder (B), Sustainability, 12, Friend 201
-AR Navigator, Education, 13, Friend 201
-Chat Platform, Social Good, 14, Friend 201
-Mental Health App, Health, 15, Friend 201
+AI Assistant, Health, 11, Friend 201, , Best AI-Powered App|Best Use of Gemini API
+Parking Finder (B), Sustainability, 12, Friend 201, , 
+AR Navigator, Education, 13, Friend 201, , Best Use of Gemini API
+Chat Platform, Social Good, 14, Friend 201, , Best Use of Knot API
+Mental Health App, Health, 15, Friend 201, , Best AI-Powered App
 # Floor 2 - Friend 203 (5 teams)
-Carbon Calculator, Sustainability, 16, Friend 203
-Study Buddy, Education, 17, Friend 203
-Habit Builder, Health, 18, Friend 203
-Recipe AI, Health, 19, Friend 203
-Commute Optimizer, Sustainability, 20, Friend 203
+Carbon Calculator, Sustainability, 16, Friend 203, , Best Use of Gemini API|Best Use of K2 Think V2
+Study Buddy, Education, 17, Friend 203, , Best AI-Powered App
+Habit Builder, Health, 18, Friend 203, , 
+Recipe AI, Health, 19, Friend 203, , Best AI-Powered App|Best Use of Gemini API
+Commute Optimizer, Sustainability, 20, Friend 203, , Best Use of Knot API
 # Floor 3 - Sherrerd 301 (5 teams)
-AR Navigator (B), Education, 21, Sherrerd 301
-Volunteer Hub, Social Good, 22, Sherrerd 301
-Parking Finder (C), Sustainability, 23, Sherrerd 301
-Reading List (B), Education, 24, Sherrerd 301
-AI Assistant (B), Health, 25, Sherrerd 301
+AR Navigator (B), Education, 21, Sherrerd 301, , Best Use of Gemini API
+Volunteer Hub, Social Good, 22, Sherrerd 301, , 
+Parking Finder (C), Sustainability, 23, Sherrerd 301, , Best Use of K2 Think V2
+Reading List (B), Education, 24, Sherrerd 301, , 
+AI Assistant (B), Health, 25, Sherrerd 301, , Best AI-Powered App|Best Use of Gemini API|Best Use of Knot API
 # Floor 3 - Sherrerd 303 (5 teams)
-Donation Platform, Social Good, 26, Sherrerd 303
-Virtual Tutor, Education, 27, Sherrerd 303
-Music Generator, Finance, 28, Sherrerd 303
-Language Tutor, Education, 29, Sherrerd 303
-Carbon Calculator (B), Sustainability, 30, Sherrerd 303
+Donation Platform, Social Good, 26, Sherrerd 303, , Best Use of Knot API
+Virtual Tutor, Education, 27, Sherrerd 303, , Best AI-Powered App|Best Use of Gemini API
+Music Generator, Finance, 28, Sherrerd 303, , Best AI-Powered App
+Language Tutor, Education, 29, Sherrerd 303, , Best Use of Gemini API|Best Use of K2 Think V2
+Carbon Calculator (B), Sustainability, 30, Sherrerd 303, , Best Use of Knot API

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
 import type { Event, Judge, Team, Room, JudgingSetWithTeams } from '@/lib/types';
+import JudgeSetsDrawer from './JudgeSetsDrawer';
 
 interface JudgeWithSet extends Judge {
   active_set: JudgingSetWithTeams | null;
@@ -44,6 +45,7 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
   const [view, setView] = useState<'judges' | 'teams'>('judges');
+  const [openJudgeId, setOpenJudgeId] = useState<string | null>(null);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef(false);
@@ -159,6 +161,27 @@ function DashboardContent() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event_id: dashboardEventId, action }),
     });
+    loadData();
+  };
+
+  const abandonSet = async (setId: string, judgeName: string, elapsedMins: number) => {
+    const ok = window.confirm(
+      `Reclaim teams from ${judgeName}?\n\n` +
+      `Their current set (${Math.floor(elapsedMins)}m elapsed) will be marked expired and the teams returned to the pool. ` +
+      `Use this when you believe the judge has disappeared and isn't coming back.`
+    );
+    if (!ok) return;
+
+    const res = await fetch(`/api/organizer/sets/${setId}/abandon`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'organizer reclaimed via dashboard' }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as { error?: string }));
+      alert(`Failed to reclaim: ${body.error || res.statusText}`);
+      return;
+    }
     loadData();
   };
 
@@ -288,7 +311,20 @@ function DashboardContent() {
             const elapsed = hasActiveSet ? getElapsedMinutes(judge.active_set!.assigned_at) : 0;
 
             return (
-              <article key={judge.id} className="space-y-3">
+              <article
+                key={judge.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open sets for ${judge.name}`}
+                onClick={() => setOpenJudgeId(judge.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setOpenJudgeId(judge.id);
+                  }
+                }}
+                className="-m-2 cursor-pointer space-y-3 rounded-lg p-2 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -353,6 +389,22 @@ function DashboardContent() {
                           </li>
                         ))}
                     </ul>
+
+                    <div className="flex justify-end pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          abandonSet(judge.active_set!.id, judge.name, elapsed);
+                        }}
+                        className="text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                        title="Mark this set expired and release the teams back into the pool"
+                      >
+                        Reclaim teams
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
@@ -414,6 +466,10 @@ function DashboardContent() {
             );
           })}
         </section>
+      )}
+
+      {openJudgeId && (
+        <JudgeSetsDrawer judgeId={openJudgeId} onClose={() => setOpenJudgeId(null)} />
       )}
     </div>
   );

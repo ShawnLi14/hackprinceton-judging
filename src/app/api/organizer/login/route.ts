@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { actorOrganizer, logEvent } from '@/lib/log';
 
 export async function POST(req: NextRequest) {
   const { admin_code, event_id } = await req.json();
@@ -16,8 +17,22 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error || !event) {
+    await logEvent({
+      event_id,
+      actor: actorOrganizer(),
+      action: 'organizer.login_failed',
+      message: 'Invalid admin code',
+      details: { reason: 'invalid_admin_code' },
+    });
     return NextResponse.json({ error: 'Invalid admin code' }, { status: 401 });
   }
+
+  await logEvent({
+    event_id,
+    actor: actorOrganizer(),
+    action: 'organizer.login',
+    message: `Organizer logged in to "${event.name}"`,
+  });
 
   return NextResponse.json({ event });
 }

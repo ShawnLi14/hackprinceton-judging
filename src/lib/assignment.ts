@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { actorSystem, describeError, logEvent } from './log';
 import type { JudgingSetWithTeams } from './types';
 
 // ============================================
@@ -56,7 +57,16 @@ async function releaseInactiveJudgeAssignments(eventId: string): Promise<void> {
 
   if (lockReleaseError) {
     console.error('Failed to release locks for inactive judge sets:', lockReleaseError.message);
+    return;
   }
+
+  await logEvent({
+    event_id: eventId,
+    actor: actorSystem(),
+    action: 'lock.released_inactive_judges',
+    message: `Released locks for ${abandonedSetIds.length} set(s) belonging to inactive judges`,
+    details: { set_ids: abandonedSetIds, judge_ids: inactiveJudgeIds },
+  });
 }
 
 async function cleanupStaleAssignments(eventId: string): Promise<void> {
@@ -73,6 +83,14 @@ async function cleanupStaleAssignments(eventId: string): Promise<void> {
 
   await releaseInactiveJudgeAssignments(eventId);
 
+  // Snapshot active sets before/after so we can log which ones expired.
+  const { data: activeBefore } = await supabase
+    .from('judging_sets')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('status', 'active');
+  const beforeIds = new Set((activeBefore || []).map(s => s.id));
+
   const { error: releaseError } = await supabase.rpc('release_expired_locks', {
     p_event_id: eventId,
     p_max_minutes: eventConfig.max_judging_minutes,
@@ -80,6 +98,32 @@ async function cleanupStaleAssignments(eventId: string): Promise<void> {
 
   if (releaseError) {
     console.error('Failed to release expired locks:', releaseError.message);
+    await logEvent({
+      event_id: eventId,
+      actor: actorSystem(),
+      action: 'lock.release_expired_failed',
+      message: 'release_expired_locks RPC failed',
+      details: { error: describeError(releaseError) },
+    });
+    return;
+  }
+
+  const { data: activeAfter } = await supabase
+    .from('judging_sets')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('status', 'active');
+  const afterIds = new Set((activeAfter || []).map(s => s.id));
+  const expiredIds = [...beforeIds].filter(id => !afterIds.has(id));
+
+  if (expiredIds.length > 0) {
+    await logEvent({
+      event_id: eventId,
+      actor: actorSystem(),
+      action: 'set.expired',
+      message: `Expired ${expiredIds.length} stale set(s) past ${eventConfig.max_judging_minutes}m timeout`,
+      details: { set_ids: expiredIds, max_minutes: eventConfig.max_judging_minutes },
+    });
   }
 }
 
@@ -208,12 +252,23 @@ async function fallbackAssignNextSet(
     return null;
   }
 
+  // Tiebreaker: room_number + small random jitter (mirrors the SQL RPC).
+  // Pre-compute a stable jitter per candidate so the comparator stays
+  // transitive — re-rolling random() inside the comparator can violate
+  // sort invariants and produce surprising orderings.
   const candidates = availableTeams
     .filter(team => team.room!.floor === bestFloor)
+    .map(team => ({
+      team,
+      sortKey: team.room!.room_number + Math.random() * 3,
+    }))
     .sort((a, b) => {
-      if (a.times_judged !== b.times_judged) return a.times_judged - b.times_judged;
-      return a.room!.room_number - b.room!.room_number;
-    });
+      if (a.team.times_judged !== b.team.times_judged) {
+        return a.team.times_judged - b.team.times_judged;
+      }
+      return a.sortKey - b.sortKey;
+    })
+    .map(entry => entry.team);
 
   const assignedAt = new Date().toISOString();
   const { data: createdSet, error: setError } = await supabase
@@ -309,11 +364,25 @@ export async function assignNextSet(
 
   if (rpcError) {
     console.error('Assignment RPC error:', rpcError.message);
+    await logEvent({
+      event_id: eventId,
+      actor: actorSystem(),
+      action: 'assign.fallback_used',
+      message: 'assign_set_to_judge RPC failed; falling back to JS path',
+      details: { judge_id: judgeId, error: describeError(rpcError) },
+    });
     return fallbackAssignNextSet(judgeId, eventId);
   }
 
   if (!setId) {
     console.error('No set ID returned from assignment');
+    await logEvent({
+      event_id: eventId,
+      actor: actorSystem(),
+      action: 'assign.fallback_used',
+      message: 'assign_set_to_judge RPC returned no set; falling back to JS path',
+      details: { judge_id: judgeId },
+    });
     return fallbackAssignNextSet(judgeId, eventId);
   }
 
