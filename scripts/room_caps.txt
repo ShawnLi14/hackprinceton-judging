@@ -1,0 +1,19 @@
+# Room Name, Team Count
+# Rooms are filled top-to-bottom. Within each room, table numbers run 1..N.
+# Edit this file freely; assign_rooms.py respects whatever order you put here.
+LAS 171 Atrium, 28
+LAS A71, 13
+JRR 399 Ruehl, 11
+JRR 101, 11
+LAS B60B, 11
+JRR 217, 9
+JRR A97, 8
+JRR A98, 8
+JRR 198, 8
+LAS 144, 6
+JRR 201, 5
+JRR 298, 5
+LAS B60A, 5
+LAS B60C, 5
+JRR 301, 4
+JRR 397, 4
