@@ -79,7 +79,10 @@ export async function GET(req: NextRequest) {
 
   for (const set of rows) {
     const judge = set.judge as unknown as { name: string; access_code: string } | null;
-    const setTeams = (set.judging_set_teams || []) as Array<{
+    // Supabase's generated types now infer nested joins as arrays, even when
+    // the FK is to-one. Round-trip through `unknown` so we can re-narrow to
+    // the actual to-one shape we know we're getting back from this query.
+    const setTeams = (set.judging_set_teams || []) as unknown as Array<{
       id: string;
       team_id: string;
       visit_order: number;

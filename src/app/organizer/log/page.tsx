@@ -177,7 +177,7 @@ function LogContent() {
           <ul className="divide-y font-mono text-xs">
             {filtered.map(r => {
               const isOpen = expanded.has(r.id);
-              const hasDetails = r.details && Object.keys(r.details as object).length > 0;
+              const hasDetails = !!r.details && Object.keys(r.details as object).length > 0;
               return (
                 <li key={r.id} className="px-3 py-1.5 hover:bg-muted/30">
                   <button
