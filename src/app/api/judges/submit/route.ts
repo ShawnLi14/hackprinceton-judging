@@ -105,7 +105,18 @@ export async function POST(req: NextRequest) {
     is_absent: e.is_absent,
   }));
 
+  const started = Date.now();
   const success = await submitJudgingSet(judging_set_id, payload);
+  const elapsedMs = Date.now() - started;
+  if (elapsedMs > 2000) {
+    await logEvent({
+      event_id: eventId,
+      actor,
+      action: 'set.submit_slow',
+      message: `${actor} submit took ${elapsedMs}ms`,
+      details: { judging_set_id, elapsed_ms: elapsedMs },
+    });
+  }
 
   if (!success) {
     await logEvent({

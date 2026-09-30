@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       details: { judge_id },
     });
     return NextResponse.json(
-      { error: 'No teams available for assignment. All teams may be currently being judged or have reached their target.' },
+      { error: 'No teams available right now. Every remaining team is either at the simultaneous-judge cap or already judged by you.' },
       { status: 404 }
     );
   }

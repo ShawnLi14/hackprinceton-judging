@@ -6,9 +6,10 @@
  *
  * Each scenario creates a fresh event, imports generated data, runs
  * judge bots, and validates correctness:
- *   - No team is judged by two judges simultaneously
+ *   - A team may be judged by several judges at once, up to the event cap
+ *   - The same judge is never assigned the same team twice
  *   - All teams get judged roughly equally
- *   - No errors in the flow
+ *   - Submits finish in seconds, not minutes
  *   - Rankings are properly recorded
  *
  * Usage: node test/run-simulation.js [BASE_URL]
@@ -78,6 +79,25 @@ const SCENARIOS = [
     set_size: 3,
     target_judgings: 2,
     max_sets_per_judge: 4,
+  },
+  {
+    // 40 / 5 = 8 exclusive seats. Twelve judges can only all hold a set when
+    // teams are shared. Scaled-down version of ~150 teams and 30+ judges.
+    name: 'Saturated — more judges than teams/5',
+    teams: 40,
+    rooms: [
+      { name: 'Hall A', number: '101', floor: 1 },
+      { name: 'Hall B', number: '102', floor: 1 },
+      { name: 'Hall C', number: '201', floor: 2 },
+      { name: 'Hall D', number: '202', floor: 2 },
+    ],
+    judges: 12,
+    set_size: 5,
+    target_judgings: 2,
+    max_sets_per_judge: 2,
+    max_concurrent_judges: 3,
+    hold_ms: 2500,
+    expectOverlap: true,
   },
   {
     name: 'Small — fewer teams than judges',
@@ -371,12 +391,13 @@ function sleep(ms) {
 // Judge Bot
 // ============================================
 class JudgeBot {
-  constructor(name, accessCode, eventId, botId, stats) {
+  constructor(name, accessCode, eventId, botId, stats, holdMs = 0) {
     this.name = name;
     this.accessCode = accessCode;
     this.eventId = eventId;
     this.botId = botId;
     this.stats = stats;
+    this.holdMs = holdMs;
     this.judgeId = null;
     this.setsCompleted = 0;
     this.running = true;
@@ -409,14 +430,28 @@ class JudgeBot {
       this.stats.totalSetsAssigned++;
       const set = result.set;
 
+      const cap = this.stats.maxConcurrent || 3;
       for (const st of set.judging_set_teams || []) {
-        const existingJudge = this.stats.activeTeamLocks.get(st.team_id);
-        if (existingJudge) {
-          const violation = `Team ${st.team?.project_name || st.team_id} assigned to BOTH ${existingJudge} AND ${this.name}`;
+        const holders = this.stats.activeTeamLocks.get(st.team_id) || new Set();
+        holders.add(this.name);
+        this.stats.activeTeamLocks.set(st.team_id, holders);
+        this.stats.maxInflight = Math.max(this.stats.maxInflight || 0, holders.size);
+        if (holders.size > cap) {
+          const violation = `Team ${st.team?.project_name || st.team_id} held by ${holders.size} judges (cap ${cap}): ${[...holders].join(', ')}`;
           log(violation, 'ERROR');
-          this.stats.concurrencyViolations.push(violation);
+          this.stats.capViolations.push(violation);
         }
-        this.stats.activeTeamLocks.set(st.team_id, this.name);
+
+        const pairKey = `${this.name}|${st.team_id}`;
+        const seenSets = this.stats.judgeTeamSets.get(pairKey) || new Set();
+        const otherSets = [...seenSets].filter(id => id !== set.id);
+        if (otherSets.length > 0) {
+          const violation = `${this.name} was assigned team ${st.team?.project_name || st.team_id} in a second set`;
+          log(violation, 'ERROR');
+          this.stats.repeatViolations.push(violation);
+        }
+        seenSets.add(set.id);
+        this.stats.judgeTeamSets.set(pairKey, seenSets);
       }
 
       return set;
@@ -458,14 +493,20 @@ class JudgeBot {
     }));
 
     for (const st of set.judging_set_teams || []) {
-      this.stats.activeTeamLocks.delete(st.team_id);
+      const holders = this.stats.activeTeamLocks.get(st.team_id);
+      if (holders) {
+        holders.delete(this.name);
+        if (holders.size === 0) this.stats.activeTeamLocks.delete(st.team_id);
+      }
     }
 
     try {
+      const submitStarted = Date.now();
       await apiPost('/api/judges/submit', {
         judging_set_id: set.id,
         evaluations,
       });
+      this.stats.submitLatencies.push(Date.now() - submitStarted);
       this.stats.totalSetsCompleted++;
       this.setsCompleted++;
       for (const st of set.judging_set_teams || []) {
@@ -495,6 +536,7 @@ class JudgeBot {
         continue;
       }
       consecutiveFailures = 0;
+      if (this.holdMs) await sleep(this.holdMs);
       await this.visitTeams(set);
       await sleep(50 + Math.random() * 100);
       await this.submitRankings(set);
@@ -516,9 +558,15 @@ function freshStats() {
     assignmentErrors: [],
     submissionErrors: [],
     concurrencyViolations: [],
+    capViolations: [],
+    repeatViolations: [],
+    submitLatencies: [],
+    maxInflight: 0,
+    maxConcurrent: 3,
     teamJudgeCounts: {},
     judgeSetCounts: {},
     activeTeamLocks: new Map(),
+    judgeTeamSets: new Map(),
   };
 }
 
@@ -534,6 +582,7 @@ async function runScenario(scenario) {
       set_size: scenario.set_size,
       target_judgings_per_team: scenario.target_judgings,
       max_judging_minutes: 30,
+      max_concurrent_judges: scenario.max_concurrent_judges || 3,
       admin_code: 'TEST-ADMIN',
       password: SITE_PASSWORD,
     });
@@ -557,9 +606,10 @@ async function runScenario(scenario) {
 
     const judgeList = judgesResult.items;
     const startTime = Date.now();
+    stats.maxConcurrent = scenario.max_concurrent_judges || 3;
 
     const bots = judgeList.map((j, i) =>
-      new JudgeBot(j.name, j.access_code, event.id, i + 1, stats)
+      new JudgeBot(j.name, j.access_code, event.id, i + 1, stats, scenario.hold_ms || 0)
     );
     await Promise.all(bots.map(bot => bot.run(scenario.max_sets_per_judge)));
 
@@ -589,9 +639,32 @@ async function runScenario(scenario) {
       stats.totalErrors++;
     }
 
+    if (stats.submitLatencies.length > 0) {
+      const sorted = stats.submitLatencies.slice().sort((a, b) => a - b);
+      const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+      const slowest = sorted[sorted.length - 1];
+      log(`  Submit latency: p95 ${p95}ms, max ${slowest}ms over ${sorted.length} submits`);
+      if (slowest > 20000) {
+        log(`  Submit took ${slowest}ms (over 20s)`, 'ERROR');
+        stats.totalErrors++;
+      }
+    }
+
+    if (scenario.expectOverlap && stats.maxInflight < 2) {
+      log(`  Expected teams to be judged by overlapping judges, peak inflight was ${stats.maxInflight}`, 'ERROR');
+      stats.totalErrors++;
+    }
+
+    if (stats.capViolations.length > 0 || stats.repeatViolations.length > 0) {
+      stats.totalErrors++;
+    }
+
     try { await apiPost('/api/organizer/start', { event_id: event.id, action: 'complete' }); } catch (_) {}
 
-    const passed = stats.totalErrors === 0 && stats.concurrencyViolations.length === 0;
+    const passed = stats.totalErrors === 0
+      && stats.concurrencyViolations.length === 0
+      && stats.capViolations.length === 0
+      && stats.repeatViolations.length === 0;
 
     return {
       scenario: tag,

@@ -9,39 +9,44 @@ export async function GET(req: NextRequest) {
   const eventId = req.nextUrl.searchParams.get('event_id');
   if (!eventId) return NextResponse.json({ error: 'Missing event_id' }, { status: 400 });
 
-  const { data: judges, error } = await supabase
-    .from('judges')
-    .select('*, current_room:rooms(*)')
-    .eq('event_id', eventId)
-    .eq('is_active', true)
-    .order('name');
+  const [{ data: judges, error }, { data: activeSets, error: setsError }] = await Promise.all([
+    supabase
+      .from('judges')
+      .select('*, current_room:rooms(*)')
+      .eq('event_id', eventId)
+      .eq('is_active', true)
+      .order('name'),
+    // One query for every live set. The previous per-judge lookup ran on
+    // every visit and submit (the dashboard subscribes to those tables) and
+    // queued behind judge requests once ~30 people were judging at once.
+    supabase
+      .from('judging_sets')
+      .select(`
+        *,
+        judging_set_teams(
+          *,
+          team:teams(*, room:rooms(*))
+        )
+      `)
+      .eq('event_id', eventId)
+      .eq('status', 'active')
+      .order('assigned_at', { ascending: false }),
+  ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (setsError) return NextResponse.json({ error: setsError.message }, { status: 400 });
 
-  // For each judge, get their active set with team details
-  const judgesWithSets = await Promise.all(
-    (judges || []).map(async (judge) => {
-      const { data: activeSet } = await supabase
-        .from('judging_sets')
-        .select(`
-          *,
-          judging_set_teams(
-            *,
-            team:teams(*, room:rooms(*))
-          )
-        `)
-        .eq('judge_id', judge.id)
-        .eq('status', 'active')
-        .order('assigned_at', { ascending: false })
-        .limit(1)
-        .single();
+  const activeSetByJudge = new Map<string, NonNullable<typeof activeSets>[number]>();
+  for (const set of activeSets || []) {
+    if (!activeSetByJudge.has(set.judge_id)) {
+      activeSetByJudge.set(set.judge_id, set);
+    }
+  }
 
-      return {
-        ...judge,
-        active_set: activeSet || null,
-      };
-    })
-  );
+  const judgesWithSets = (judges || []).map(judge => ({
+    ...judge,
+    active_set: activeSetByJudge.get(judge.id) || null,
+  }));
 
   return NextResponse.json(judgesWithSets);
 }

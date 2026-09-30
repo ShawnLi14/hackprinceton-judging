@@ -8,6 +8,7 @@ export interface Event {
   set_size: number;
   target_judgings_per_team: number;
   max_judging_minutes: number;
+  max_concurrent_judges: number;
   status: 'setup' | 'active' | 'paused' | 'completed';
   admin_code: string;
   created_at: string;

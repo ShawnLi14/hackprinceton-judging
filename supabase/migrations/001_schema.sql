@@ -3,10 +3,10 @@
 -- ============================================
 -- This file is the canonical full schema for fresh installs. The
 -- additive migrations 002_event_log.sql, 003_edit_completed_set.sql,
--- and 004_abandon_judging_set.sql are mirrored at the bottom of this
--- file (search for "Mirror of") so existing deployments can apply them
--- incrementally while a fresh `supabase db reset` against this file
--- gets everything in one shot.
+-- 004_abandon_judging_set.sql, and 005_concurrent_judging.sql are mirrored
+-- in this file (search for "Mirror of", and the concurrent-judging objects
+-- below) so existing deployments can apply them incrementally while a fresh
+-- `supabase db reset` against this file gets everything in one shot.
 
 -- Events table: one row per hackathon event
 CREATE TABLE events (
@@ -15,6 +15,10 @@ CREATE TABLE events (
   set_size INTEGER NOT NULL DEFAULT 5,
   target_judgings_per_team INTEGER NOT NULL DEFAULT 3,
   max_judging_minutes INTEGER NOT NULL DEFAULT 20,
+  -- How many judges may be with the same team at once. 1 restores exclusive
+  -- locking. Default 3 covers a field where judges > teams/set_size.
+  max_concurrent_judges INTEGER NOT NULL DEFAULT 3,
+  CONSTRAINT events_max_concurrent_judges_check CHECK (max_concurrent_judges >= 1),
   status TEXT NOT NULL DEFAULT 'setup' CHECK (status IN ('setup', 'active', 'paused', 'completed')),
   admin_code TEXT NOT NULL DEFAULT 'ADMIN',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -103,7 +107,9 @@ CREATE TABLE judging_set_teams (
 CREATE INDEX idx_jst_set ON judging_set_teams(judging_set_id);
 CREATE INDEX idx_jst_team ON judging_set_teams(team_id);
 
--- Team locks: prevent double-judging
+-- Team locks: one active claim per (team, judging set).
+-- Several judges may hold the same team at once, up to events.max_concurrent_judges.
+-- UNIQUE(team_id, judging_set_id) only stops one set from locking a team twice.
 CREATE TABLE team_locks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
@@ -116,11 +122,10 @@ CREATE TABLE team_locks (
 CREATE INDEX idx_team_locks_team ON team_locks(team_id);
 CREATE INDEX idx_team_locks_active ON team_locks(team_id) WHERE released_at IS NULL;
 
--- Partial unique index: only ONE active (unreleased) lock per team at a time.
--- This is the core constraint that prevents double-judging at the DB level.
-CREATE UNIQUE INDEX idx_team_locks_one_active_per_team
-  ON team_locks(team_id)
-  WHERE released_at IS NULL;
+CREATE INDEX idx_judging_sets_judge_status ON judging_sets (judge_id, status);
+CREATE INDEX idx_judging_sets_active_by_judge
+  ON judging_sets (judge_id, assigned_at DESC)
+  WHERE status = 'active';
 
 -- ============================================
 -- Functions
@@ -140,6 +145,16 @@ $$ LANGUAGE sql STABLE;
 CREATE OR REPLACE FUNCTION release_expired_locks(p_event_id UUID, p_max_minutes INTEGER)
 RETURNS void AS $$
 BEGIN
+  -- Locks whose set is already finished. Submit and abandon release these
+  -- themselves; this covers a crash between the two updates.
+  UPDATE team_locks tl
+  SET released_at = now()
+  FROM judging_sets js
+  WHERE tl.judging_set_id = js.id
+    AND js.event_id = p_event_id
+    AND js.status <> 'active'
+    AND tl.released_at IS NULL;
+
   UPDATE team_locks tl
   SET released_at = now()
   FROM judging_sets js
@@ -166,11 +181,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================
--- Atomic team assignment (prevents race conditions)
+-- Atomic team assignment
 -- ============================================
--- For each candidate team, tries INSERT INTO team_locks with ON CONFLICT DO NOTHING.
--- The partial unique index guarantees at most ONE active lock per team.
--- GET DIAGNOSTICS ROW_COUNT tells us if the lock was acquired.
+-- Several judges may hold the same team, up to events.max_concurrent_judges.
+-- Serialized per event so concurrent requests see each other's new locks.
+-- Load = times_judged + active locks. A judge never receives a team they
+-- already completed or are currently visiting.
+-- Keep the ordering in sync with src/lib/assignment-policy.ts.
 CREATE OR REPLACE FUNCTION assign_set_to_judge(
   p_event_id UUID,
   p_judge_id UUID
@@ -179,101 +196,164 @@ RETURNS UUID AS $$
 DECLARE
   v_set_size INTEGER;
   v_target INTEGER;
+  v_max_concurrent INTEGER;
   v_status TEXT;
   v_judge_floor INTEGER;
+  v_judge_active BOOLEAN;
+  v_judge_status TEXT;
   v_best_floor INTEGER;
   v_set_id UUID;
-  v_rec RECORD;
-  v_order INTEGER := 0;
-  v_rowcount INTEGER;
+  v_existing UUID;
+  v_count INTEGER;
 BEGIN
-  -- Get event config
-  SELECT set_size, target_judgings_per_team, status
-  INTO v_set_size, v_target, v_status
+  -- One assignment at a time per event. Without this, parallel "get next
+  -- set" clicks all snapshot times_judged = 0 and stack onto the same teams.
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_event_id::text, 0));
+
+  SELECT set_size, target_judgings_per_team, status, COALESCE(max_concurrent_judges, 3)
+  INTO v_set_size, v_target, v_status, v_max_concurrent
   FROM events WHERE id = p_event_id;
 
+  IF v_status IS NULL THEN
+    RAISE EXCEPTION 'Event not found';
+  END IF;
   IF v_status != 'active' THEN
     RAISE EXCEPTION 'Event is not active';
   END IF;
+  IF v_max_concurrent < 1 THEN
+    v_max_concurrent := 1;
+  END IF;
 
-  -- Get judge's current floor preference
-  SELECT r.floor INTO v_judge_floor
+  SELECT j.is_active, j.status, r.floor
+  INTO v_judge_active, v_judge_status, v_judge_floor
   FROM judges j
   LEFT JOIN rooms r ON r.id = j.current_room_id
   WHERE j.id = p_judge_id;
 
-  -- Pick the best floor: prefer floors with the most under-target unlocked teams,
-  -- but fall back to any floor with unlocked teams (even if all are above target).
-  -- On ties, prefer judge's current floor.
+  IF v_judge_active IS NULL THEN
+    RAISE EXCEPTION 'Judge not found';
+  END IF;
+  IF v_judge_active = false THEN
+    RAISE EXCEPTION 'Judge is deactivated';
+  END IF;
+  IF v_judge_status = 'on_break' THEN
+    RAISE EXCEPTION 'Judge is on break';
+  END IF;
+
+  -- A double-click must not open a second set. Hand back the one they have.
+  SELECT id INTO v_existing
+  FROM judging_sets
+  WHERE judge_id = p_judge_id AND status = 'active'
+  ORDER BY assigned_at DESC
+  LIMIT 1;
+
+  IF v_existing IS NOT NULL THEN
+    RETURN v_existing;
+  END IF;
+
+  -- Prefer the floor with the most under-target teams that still have room
+  -- for another judge. Ties prefer the judge's current floor.
   SELECT sub.fl INTO v_best_floor
   FROM (
     SELECT r.floor AS fl,
            COUNT(*) AS avail,
-           COUNT(*) FILTER (WHERE t.times_judged < v_target) AS under_target
+           COUNT(*) FILTER (
+             WHERE t.times_judged < v_target AND COALESCE(lc.cnt, 0) = 0
+           ) AS fresh,
+           COUNT(*) FILTER (
+             WHERE t.times_judged + COALESCE(lc.cnt, 0) < v_target
+           ) AS under_target
     FROM teams t
     JOIN rooms r ON r.id = t.room_id
-    LEFT JOIN team_locks tl ON tl.team_id = t.id AND tl.released_at IS NULL
+    LEFT JOIN (
+      SELECT team_id, COUNT(*)::int AS cnt
+      FROM team_locks
+      WHERE released_at IS NULL
+      GROUP BY team_id
+    ) lc ON lc.team_id = t.id
     WHERE t.event_id = p_event_id
       AND t.is_active = true
-      AND tl.id IS NULL
+      AND COALESCE(lc.cnt, 0) < v_max_concurrent
+      AND NOT EXISTS (
+        SELECT 1
+        FROM judging_set_teams jst
+        JOIN judging_sets js ON js.id = jst.judging_set_id
+        WHERE jst.team_id = t.id
+          AND js.judge_id = p_judge_id
+          AND js.status IN ('active', 'completed')
+      )
     GROUP BY r.floor
     HAVING COUNT(*) >= 1
   ) sub
-  ORDER BY sub.under_target DESC, sub.avail DESC,
-           CASE WHEN sub.fl = v_judge_floor THEN 0 ELSE 1 END
+  ORDER BY sub.fresh DESC, sub.under_target DESC, sub.avail DESC,
+           CASE WHEN sub.fl = v_judge_floor THEN 0 ELSE 1 END,
+           sub.fl
   LIMIT 1;
 
   IF v_best_floor IS NULL THEN
     RAISE EXCEPTION 'No available teams on any floor';
   END IF;
 
-  -- Create the judging set
   INSERT INTO judging_sets (event_id, judge_id, status, assigned_at)
   VALUES (p_event_id, p_judge_id, 'active', now())
   RETURNING id INTO v_set_id;
 
-  -- Iterate candidate teams; try to lock each one.
-  -- ON CONFLICT DO NOTHING + GET DIAGNOSTICS ensures no double-locking.
-  -- All active teams on the chosen floor are candidates, ordered by
-  -- times_judged ASC so under-target teams are prioritized first.
-  --
-  -- Tiebreaker: room_number + small random jitter. Without the jitter,
-  -- judges always sweep low-numbered rooms first, which causes everyone
-  -- to converge on the same teams (and leaves high-numbered rooms cold).
-  -- A jitter of ~3 means neighboring rooms can swap order while distant
-  -- rooms stay in their natural sequence — preserving locality without
-  -- being deterministic.
-  FOR v_rec IN
-    SELECT t.id AS tid
+  -- Tiebreaker: room_number + small random jitter, computed once per row.
+  -- Without the jitter, judges always sweep low-numbered rooms first.
+  -- A jitter of ~3 lets neighboring rooms swap while distant rooms stay put.
+  WITH load AS (
+    SELECT team_id, COUNT(*)::int AS cnt
+    FROM team_locks
+    WHERE released_at IS NULL
+    GROUP BY team_id
+  ),
+  scored AS (
+    SELECT t.id AS team_id,
+           (t.times_judged + COALESCE(lc.cnt, 0)) AS load_score,
+           (r.room_number::float + random() * 3.0) AS sort_key
     FROM teams t
     JOIN rooms r ON r.id = t.room_id
+    LEFT JOIN load lc ON lc.team_id = t.id
     WHERE t.event_id = p_event_id
       AND t.is_active = true
       AND r.floor = v_best_floor
-    ORDER BY t.times_judged ASC, (r.room_number::float + random() * 3.0)
-  LOOP
-    EXIT WHEN v_order >= v_set_size;
-
+      AND COALESCE(lc.cnt, 0) < v_max_concurrent
+      AND NOT EXISTS (
+        SELECT 1
+        FROM judging_set_teams jst
+        JOIN judging_sets js ON js.id = jst.judging_set_id
+        WHERE jst.team_id = t.id
+          AND js.judge_id = p_judge_id
+          AND js.status IN ('active', 'completed')
+      )
+  ),
+  picked AS (
+    SELECT team_id,
+           ROW_NUMBER() OVER (ORDER BY load_score ASC, sort_key ASC) AS visit_order
+    FROM scored
+  ),
+  chosen AS (
+    SELECT team_id, visit_order
+    FROM picked
+    WHERE visit_order <= v_set_size
+  ),
+  ins_locks AS (
     INSERT INTO team_locks (team_id, judging_set_id)
-    VALUES (v_rec.tid, v_set_id)
-    ON CONFLICT (team_id) WHERE released_at IS NULL
-    DO NOTHING;
+    SELECT team_id, v_set_id FROM chosen
+    RETURNING team_id
+  )
+  INSERT INTO judging_set_teams (judging_set_id, team_id, visit_order)
+  SELECT v_set_id, c.team_id, c.visit_order
+  FROM chosen c
+  JOIN ins_locks il ON il.team_id = c.team_id;
 
-    GET DIAGNOSTICS v_rowcount = ROW_COUNT;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
 
-    IF v_rowcount > 0 THEN
-      v_order := v_order + 1;
-      INSERT INTO judging_set_teams (judging_set_id, team_id, visit_order)
-      VALUES (v_set_id, v_rec.tid, v_order);
-    END IF;
-  END LOOP;
-
-  IF v_order = 0 THEN
+  IF v_count = 0 THEN
     DELETE FROM judging_sets WHERE id = v_set_id;
     RAISE EXCEPTION 'No available teams could be locked';
   END IF;
 
-  -- Update judge status and location
   UPDATE judges
   SET status = 'active',
       current_room_id = (

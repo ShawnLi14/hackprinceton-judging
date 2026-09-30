@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
       set_size: body.set_size || 5,
       target_judgings_per_team: body.target_judgings_per_team || 3,
       max_judging_minutes: body.max_judging_minutes || 20,
+      max_concurrent_judges: body.max_concurrent_judges || 3,
       admin_code: body.admin_code || 'ADMIN',
     })
     .select()
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest) {
       set_size: data.set_size,
       target_judgings_per_team: data.target_judgings_per_team,
       max_judging_minutes: data.max_judging_minutes,
+      max_concurrent_judges: data.max_concurrent_judges,
     },
   });
 
@@ -81,6 +83,7 @@ export async function PATCH(req: NextRequest) {
   if (body.set_size !== undefined) updates.set_size = body.set_size;
   if (body.target_judgings_per_team !== undefined) updates.target_judgings_per_team = body.target_judgings_per_team;
   if (body.max_judging_minutes !== undefined) updates.max_judging_minutes = body.max_judging_minutes;
+  if (body.max_concurrent_judges !== undefined) updates.max_concurrent_judges = body.max_concurrent_judges;
   if (body.admin_code !== undefined) updates.admin_code = body.admin_code;
 
   if (Object.keys(updates).length === 0) {

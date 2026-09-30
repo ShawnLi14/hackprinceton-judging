@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:policy": "node --experimental-strip-types --test test/assignment-policy.test.mjs",
     "test:sim": "node test/run-simulation.js",
     "test:demo": "node test/run-demo.js"
   },
