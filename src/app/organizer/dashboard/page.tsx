@@ -41,7 +41,7 @@ function DashboardContent() {
   const [event, setEvent] = useState<Event | null>(null);
   const [judges, setJudges] = useState<JudgeWithSet[]>([]);
   const [teams, setTeams] = useState<(Team & { room?: Room })[]>([]);
-  const [locks, setLocks] = useState<Record<string, string>>({});
+  const [locks, setLocks] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
   const [view, setView] = useState<'judges' | 'teams'>('judges');
@@ -49,9 +49,12 @@ function DashboardContent() {
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef = useRef(false);
+  const pendingReload = useRef(false);
 
   const loadData = useCallback(async () => {
-    if (!dashboardEventId || loadingRef.current) {
+    if (!dashboardEventId) return;
+    if (loadingRef.current) {
+      pendingReload.current = true;
       return;
     }
     loadingRef.current = true;
@@ -78,14 +81,17 @@ function DashboardContent() {
       try {
         const { data: activeLocks } = await supabase
           .from('team_locks')
-          .select('team_id, judging_set_id, judging_set:judging_sets(judge_id, judge:judges(name))')
+          .select('team_id, judging_set:judging_sets!inner(event_id, judge:judges(name))')
+          .eq('judging_set.event_id', dashboardEventId)
           .is('released_at', null);
 
-        const lockMap: Record<string, string> = {};
+        const lockMap: Record<string, string[]> = {};
         for (const lock of activeLocks || []) {
           const judgeName =
             (lock.judging_set as unknown as { judge: { name: string } })?.judge?.name || 'Unknown';
-          lockMap[lock.team_id] = judgeName;
+          const names = lockMap[lock.team_id] || [];
+          if (!names.includes(judgeName)) names.push(judgeName);
+          lockMap[lock.team_id] = names;
         }
         setLocks(lockMap);
       } catch {
@@ -99,6 +105,10 @@ function DashboardContent() {
     } finally {
       setLoading(false);
       loadingRef.current = false;
+      if (pendingReload.current) {
+        pendingReload.current = false;
+        void loadData();
+      }
     }
   }, [dashboardEventId]);
 
@@ -167,8 +177,8 @@ function DashboardContent() {
   const abandonSet = async (setId: string, judgeName: string, elapsedMins: number) => {
     const ok = window.confirm(
       `Reclaim teams from ${judgeName}?\n\n` +
-      `Their current set (${Math.floor(elapsedMins)}m elapsed) will be marked expired and the teams returned to the pool. ` +
-      `Use this when you believe the judge has disappeared and isn't coming back.`
+      `Their current set (${Math.floor(elapsedMins)}m elapsed) will be marked expired and this judge's claim on those teams will be released. ` +
+      `Other judges already with those teams are left alone. Use this when you believe the judge has disappeared.`
     );
     if (!ok) return;
 
@@ -451,7 +461,7 @@ function DashboardContent() {
                     }`}
                   >
                     {isLocked
-                      ? `Live with ${locks[team.id]}`
+                      ? `Live with ${locks[team.id].join(', ')}`
                       : isAtTarget
                         ? 'At target'
                         : 'Needs more coverage'}

@@ -24,55 +24,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  // Resolve event/judge/team labels for the log. Best-effort.
+  // Resolve labels in parallel. This endpoint fires once per team, so a
+  // chain of sequential lookups was a large share of database time.
   let eventId: string | null = null;
   let actor = 'anonymous';
   let teamLabel: string | null = null;
   try {
-    const { data: set } = await supabase
-      .from('judging_sets')
-      .select('event_id, judge_id')
-      .eq('id', judging_set_id)
-      .single();
-    if (set) {
-      eventId = set.event_id;
-      actor = await actorFromJudgeId(set.judge_id);
-    }
-    const { data: team } = await supabase
-      .from('teams')
-      .select('team_number, project_name')
-      .eq('id', team_id)
-      .single();
-    if (team) {
-      teamLabel = team.project_name || `#${team.team_number}`;
-    }
+    const [{ data: set }, { data: team }] = await Promise.all([
+      supabase
+        .from('judging_sets')
+        .select('event_id, judge_id')
+        .eq('id', judging_set_id)
+        .single(),
+      supabase
+        .from('teams')
+        .select('team_number, project_name, room_id')
+        .eq('id', team_id)
+        .single(),
+    ]);
+
+    const actorPromise = set?.judge_id
+      ? actorFromJudgeId(set.judge_id)
+      : Promise.resolve('anonymous');
+    const roomPromise =
+      visited && set?.judge_id && team?.room_id
+        ? supabase.from('judges').update({ current_room_id: team.room_id }).eq('id', set.judge_id)
+        : Promise.resolve();
+
+    const [resolvedActor] = await Promise.all([actorPromise, roomPromise]);
+    eventId = set?.event_id || null;
+    actor = resolvedActor;
+    if (team) teamLabel = team.project_name || `#${team.team_number}`;
   } catch {
     // ignore
-  }
-
-  // Only update the judge's current room when actually marking a team visited.
-  if (visited) {
-    const { data: setTeam } = await supabase
-      .from('judging_set_teams')
-      .select('team:teams(room_id)')
-      .eq('judging_set_id', judging_set_id)
-      .eq('team_id', team_id)
-      .single();
-
-    if (setTeam) {
-      const { data: set } = await supabase
-        .from('judging_sets')
-        .select('judge_id')
-        .eq('id', judging_set_id)
-        .single();
-
-      if (set) {
-        await supabase
-          .from('judges')
-          .update({ current_room_id: (setTeam.team as unknown as { room_id: string }).room_id })
-          .eq('id', set.judge_id);
-      }
-    }
   }
 
   await logEvent({

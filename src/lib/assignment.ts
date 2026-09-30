@@ -1,3 +1,4 @@
+import { isExpectedAssignmentFailure, planAssignment, type PolicyTeam } from './assignment-policy';
 import { supabase } from './supabase';
 import { actorSystem, describeError, logEvent } from './log';
 import type { JudgingSetWithTeams } from './types';
@@ -5,12 +6,16 @@ import type { JudgingSetWithTeams } from './types';
 // ============================================
 // Team Assignment Algorithm (Atomic via RPC)
 // ============================================
-// Uses a PostgreSQL function that runs in a single transaction:
-// 1. Selects the best floor (most under-judged unlocked teams)
-// 2. Picks teams sorted by need (times_judged ASC) then proximity (room_number)
-// 3. Locks them with FOR UPDATE SKIP LOCKED to prevent race conditions
-// 4. Creates the judging set and team assignments
-// This guarantees no team is ever assigned to two judges simultaneously.
+// Uses assign_set_to_judge, which runs in one transaction under an
+// event-scoped advisory lock:
+// 1. Picks the floor with the most under-target teams that still have a
+//    free concurrent slot
+// 2. Ranks teams by times_judged + judges already with them, then room
+// 3. Allows up to events.max_concurrent_judges simultaneous judges per team
+// 4. Skips teams this judge has already completed or is currently visiting
+// The JS fallback below uses the same ordering (assignment-policy.ts) and
+// only runs when the RPC itself is missing or errors unexpectedly. Expected
+// outcomes ("event not active", "nobody left") return immediately.
 
 async function releaseInactiveJudgeAssignments(eventId: string): Promise<void> {
   const { data: inactiveJudges, error: inactiveJudgeError } = await supabase
@@ -48,6 +53,19 @@ async function releaseInactiveJudgeAssignments(eventId: string): Promise<void> {
   }
 
   const reclaimedAt = new Date().toISOString();
+
+  // Expire the set before releasing locks so a deactivated judge cannot
+  // still submit it. Other judges' locks on the same teams stay put.
+  const { error: expireError } = await supabase
+    .from('judging_sets')
+    .update({ status: 'expired', completed_at: reclaimedAt })
+    .in('id', abandonedSetIds)
+    .eq('status', 'active');
+
+  if (expireError) {
+    console.error('Failed to expire inactive judge sets:', expireError.message);
+    return;
+  }
 
   const { error: lockReleaseError } = await supabase
     .from('team_locks')
@@ -155,12 +173,12 @@ async function fallbackAssignNextSet(
   const [{ data: eventConfig, error: eventError }, { data: judge, error: judgeError }] = await Promise.all([
     supabase
       .from('events')
-      .select('set_size, target_judgings_per_team, status')
+      .select('set_size, target_judgings_per_team, max_concurrent_judges, status')
       .eq('id', eventId)
       .single(),
     supabase
       .from('judges')
-      .select('is_active, current_room_id')
+      .select('is_active, status, current_room_id')
       .eq('id', judgeId)
       .single(),
   ]);
@@ -175,8 +193,21 @@ async function fallbackAssignNextSet(
     return null;
   }
 
-  if (eventConfig.status !== 'active' || judge.is_active === false) {
+  if (eventConfig.status !== 'active' || judge.is_active === false || judge.status === 'on_break') {
     return null;
+  }
+
+  const { data: existingSet } = await supabase
+    .from('judging_sets')
+    .select('id')
+    .eq('judge_id', judgeId)
+    .eq('status', 'active')
+    .order('assigned_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingSet?.id) {
+    return fetchFullSet(existingSet.id);
   }
 
   let judgeFloor: number | null = null;
@@ -192,16 +223,21 @@ async function fallbackAssignNextSet(
     }
   }
 
-  const [{ data: teams, error: teamsError }, { data: activeLocks, error: locksError }] = await Promise.all([
+  const [{ data: teams, error: teamsError }, { data: activeLocks, error: locksError }, { data: priorSets, error: priorError }] = await Promise.all([
     supabase
       .from('teams')
-      .select('*, room:rooms(*)')
+      .select('id, room_id, times_judged, room:rooms(floor, room_number)')
       .eq('event_id', eventId)
       .eq('is_active', true),
     supabase
       .from('team_locks')
       .select('team_id')
       .is('released_at', null),
+    supabase
+      .from('judging_sets')
+      .select('id')
+      .eq('judge_id', judgeId)
+      .in('status', ['active', 'completed']),
   ]);
 
   if (teamsError || !teams) {
@@ -214,61 +250,61 @@ async function fallbackAssignNextSet(
     return null;
   }
 
-  const lockedTeamIds = new Set((activeLocks || []).map(lock => lock.team_id));
-  const availableTeams = (teams as Array<{
+  if (priorError) {
+    console.error('Fallback assignment could not load prior sets:', priorError.message);
+    return null;
+  }
+
+  const priorSetIds = (priorSets || []).map(set => set.id);
+  const alreadyJudged = new Set<string>();
+  if (priorSetIds.length > 0) {
+    const { data: priorRows, error: priorRowsError } = await supabase
+      .from('judging_set_teams')
+      .select('team_id')
+      .in('judging_set_id', priorSetIds);
+    if (priorRowsError) {
+      console.error('Fallback assignment could not load prior teams:', priorRowsError.message);
+      return null;
+    }
+    for (const row of priorRows || []) alreadyJudged.add(row.team_id);
+  }
+
+  const inflight = new Map<string, number>();
+  for (const lock of activeLocks || []) {
+    inflight.set(lock.team_id, (inflight.get(lock.team_id) || 0) + 1);
+  }
+
+  const policyTeams: PolicyTeam[] = (teams as Array<{
     id: string;
     room_id: string;
     times_judged: number;
-    room?: { floor: number; room_number: number };
-  }>).filter(team => !lockedTeamIds.has(team.id) && team.room);
+    room?: { floor: number; room_number: number } | { floor: number; room_number: number }[] | null;
+  }>).flatMap(team => {
+    const room = Array.isArray(team.room) ? team.room[0] : team.room;
+    if (!room) return [];
+    return [{
+      id: team.id,
+      floor: room.floor,
+      roomNumber: room.room_number,
+      timesJudged: team.times_judged,
+      inflight: inflight.get(team.id) || 0,
+      alreadyJudgedByThisJudge: alreadyJudged.has(team.id),
+    }];
+  });
 
-  if (availableTeams.length === 0) {
+  const plannedIds = planAssignment(policyTeams, {
+    setSize: eventConfig.set_size,
+    target: eventConfig.target_judgings_per_team,
+    maxConcurrent: eventConfig.max_concurrent_judges ?? 3,
+    judgeFloor,
+  });
+
+  if (plannedIds.length === 0) {
     return null;
   }
 
-  const floorStats = new Map<number, { floor: number; available: number; underTarget: number }>();
-  for (const team of availableTeams) {
-    const floor = team.room!.floor;
-    const current = floorStats.get(floor) || { floor, available: 0, underTarget: 0 };
-    current.available += 1;
-    if (team.times_judged < eventConfig.target_judgings_per_team) {
-      current.underTarget += 1;
-    }
-    floorStats.set(floor, current);
-  }
-
-  const bestFloor = [...floorStats.values()]
-    .sort((a, b) => {
-      if (b.underTarget !== a.underTarget) return b.underTarget - a.underTarget;
-      if (b.available !== a.available) return b.available - a.available;
-      if (judgeFloor !== null) {
-        if (a.floor === judgeFloor && b.floor !== judgeFloor) return -1;
-        if (b.floor === judgeFloor && a.floor !== judgeFloor) return 1;
-      }
-      return a.floor - b.floor;
-    })[0]?.floor;
-
-  if (bestFloor === undefined) {
-    return null;
-  }
-
-  // Tiebreaker: room_number + small random jitter (mirrors the SQL RPC).
-  // Pre-compute a stable jitter per candidate so the comparator stays
-  // transitive — re-rolling random() inside the comparator can violate
-  // sort invariants and produce surprising orderings.
-  const candidates = availableTeams
-    .filter(team => team.room!.floor === bestFloor)
-    .map(team => ({
-      team,
-      sortKey: team.room!.room_number + Math.random() * 3,
-    }))
-    .sort((a, b) => {
-      if (a.team.times_judged !== b.team.times_judged) {
-        return a.team.times_judged - b.team.times_judged;
-      }
-      return a.sortKey - b.sortKey;
-    })
-    .map(entry => entry.team);
+  const roomByTeam = new Map(policyTeams.map(team => [team.id, teams.find(row => row.id === team.id)?.room_id]));
+  const candidates = plannedIds.map(id => ({ id, room_id: roomByTeam.get(id) || '' }));
 
   const assignedAt = new Date().toISOString();
   const { data: createdSet, error: setError } = await supabase
@@ -353,6 +389,7 @@ export async function assignNextSet(
   judgeId: string,
   eventId: string
 ): Promise<JudgingSetWithTeams | null> {
+  const started = Date.now();
   await cleanupStaleAssignments(eventId);
 
   // Call the atomic RPC function
@@ -363,7 +400,15 @@ export async function assignNextSet(
     });
 
   if (rpcError) {
-    console.error('Assignment RPC error:', rpcError.message);
+    const message = rpcError.message || '';
+    // Saturated pools, paused events, and deactivated judges are normal
+    // outcomes. The old fallback walked every locked team over HTTP and
+    // pinned the database once judges outnumbered teams/set_size.
+    if (isExpectedAssignmentFailure(message)) {
+      return null;
+    }
+
+    console.error('Assignment RPC error:', message);
     await logEvent({
       event_id: eventId,
       actor: actorSystem(),
@@ -386,7 +431,18 @@ export async function assignNextSet(
     return fallbackAssignNextSet(judgeId, eventId);
   }
 
-  return fetchFullSet(setId);
+  const set = await fetchFullSet(setId);
+  const elapsedMs = Date.now() - started;
+  if (elapsedMs > 2000) {
+    await logEvent({
+      event_id: eventId,
+      actor: actorSystem(),
+      action: 'assign.slow',
+      message: `Assignment took ${elapsedMs}ms`,
+      details: { judge_id: judgeId, set_id: setId, elapsed_ms: elapsedMs },
+    });
+  }
+  return set;
 }
 
 export async function reclaimActiveAssignmentsForJudge(judgeId: string): Promise<boolean> {
@@ -407,6 +463,17 @@ export async function reclaimActiveAssignmentsForJudge(judgeId: string): Promise
   }
 
   const reclaimedAt = new Date().toISOString();
+
+  const { error: expireError } = await supabase
+    .from('judging_sets')
+    .update({ status: 'expired', completed_at: reclaimedAt })
+    .in('id', activeSetIds)
+    .eq('status', 'active');
+
+  if (expireError) {
+    console.error('Failed to expire reclaimed judging sets:', expireError.message);
+    return false;
+  }
 
   const { error: lockReleaseError } = await supabase
     .from('team_locks')

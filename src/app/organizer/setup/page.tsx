@@ -42,7 +42,7 @@ function SetupPageContent() {
 
   // Event config editing
   const [editingConfig, setEditingConfig] = useState(false);
-  const [configForm, setConfigForm] = useState({ set_size: '', target_judgings_per_team: '', max_judging_minutes: '', name: '' });
+  const [configForm, setConfigForm] = useState({ set_size: '', target_judgings_per_team: '', max_judging_minutes: '', max_concurrent_judges: '', name: '' });
   const [savingConfig, setSavingConfig] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -237,6 +237,7 @@ function SetupPageContent() {
       set_size: String(event.set_size),
       target_judgings_per_team: String(event.target_judgings_per_team),
       max_judging_minutes: String(event.max_judging_minutes),
+      max_concurrent_judges: String(event.max_concurrent_judges ?? 3),
     });
     setEditingConfig(true);
   };
@@ -254,6 +255,7 @@ function SetupPageContent() {
           set_size: parseInt(configForm.set_size) || 5,
           target_judgings_per_team: parseInt(configForm.target_judgings_per_team) || 3,
           max_judging_minutes: parseInt(configForm.max_judging_minutes) || 20,
+          max_concurrent_judges: parseInt(configForm.max_concurrent_judges) || 3,
         }),
       });
       if (res.ok) {
@@ -649,6 +651,18 @@ function SetupPageContent() {
                     className="text-sm"
                   />
                 </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Judges per team at once</Label>
+                  <Input
+                    aria-label="Maximum judges with one team at once"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={configForm.max_concurrent_judges}
+                    onChange={e => setConfigForm(p => ({ ...p, max_concurrent_judges: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
               </div>
               <div className="flex gap-2 justify-end">
                 <Button size="sm" variant="ghost" onClick={() => setEditingConfig(false)}>Cancel</Button>
@@ -658,7 +672,7 @@ function SetupPageContent() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-2 gap-4 text-center md:grid-cols-4">
               <div>
                 <p className="text-base font-semibold">{event?.set_size}</p>
                 <p className="text-xs text-muted-foreground">Teams per Set</p>
@@ -670,6 +684,10 @@ function SetupPageContent() {
               <div>
                 <p className="text-base font-semibold">{event?.max_judging_minutes}m</p>
                 <p className="text-xs text-muted-foreground">Max Time per Set</p>
+              </div>
+              <div>
+                <p className="text-base font-semibold">{event?.max_concurrent_judges ?? 3}</p>
+                <p className="text-xs text-muted-foreground">Judges per Team at Once</p>
               </div>
             </div>
           )}
