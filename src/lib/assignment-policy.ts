@@ -31,6 +31,15 @@ export function loadScore(team: Pick<PolicyTeam, 'timesJudged' | 'inflight'>): n
   return team.timesJudged + team.inflight;
 }
 
+// Exceptions assign_set_to_judge raises on purpose. Anything else (including
+// PostgREST "Could not find the function ...") must fall through to the
+// JS path. Matching on "not found" alone swallows that case.
+const EXPECTED_ASSIGNMENT_FAILURE = /Event is not active|Event not found|Judge not found|Judge is deactivated|Judge is on break|No available teams/i;
+
+export function isExpectedAssignmentFailure(message: string): boolean {
+  return EXPECTED_ASSIGNMENT_FAILURE.test(message);
+}
+
 /**
  * Team ids in visit order. Empty when every team is at the concurrent cap
  * or has already been judged by this judge.

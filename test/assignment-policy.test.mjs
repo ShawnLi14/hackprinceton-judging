@@ -12,7 +12,7 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { planAssignment } from '../src/lib/assignment-policy.ts';
+import { isExpectedAssignmentFailure, planAssignment } from '../src/lib/assignment-policy.ts';
 
 const ZERO = () => 0;
 
@@ -310,6 +310,20 @@ test('lower completed-plus-inflight teams are chosen before busier ones', () => 
   });
   // fresh load 0, live load 1, busy load 2. Room number must not jump the queue.
   assert.deepEqual(ids, ['fresh', 'live']);
+});
+
+test('a missing assignment function is not treated as an empty pool', () => {
+  assert.equal(
+    isExpectedAssignmentFailure(
+      'Could not find the function public.assign_set_to_judge(p_event_id, p_judge_id) in the schema cache'
+    ),
+    false
+  );
+  assert.equal(isExpectedAssignmentFailure('No available teams on any floor'), true);
+  assert.equal(isExpectedAssignmentFailure('No available teams could be locked'), true);
+  assert.equal(isExpectedAssignmentFailure('Event is not active'), true);
+  assert.equal(isExpectedAssignmentFailure('Judge is on break'), true);
+  assert.equal(isExpectedAssignmentFailure('Judge is deactivated'), true);
 });
 
 test('planning a 150-team field stays well under a frame', () => {

@@ -1,4 +1,4 @@
-import { planAssignment, type PolicyTeam } from './assignment-policy';
+import { isExpectedAssignmentFailure, planAssignment, type PolicyTeam } from './assignment-policy';
 import { supabase } from './supabase';
 import { actorSystem, describeError, logEvent } from './log';
 import type { JudgingSetWithTeams } from './types';
@@ -164,10 +164,6 @@ async function fetchFullSet(judgingSetId: string): Promise<JudgingSetWithTeams |
   }
 
   return fullSet as JudgingSetWithTeams;
-}
-
-function isExpectedAssignmentError(message: string): boolean {
-  return /not active|No available teams|could be locked|deactivated|on break|not found/i.test(message);
 }
 
 async function fallbackAssignNextSet(
@@ -408,7 +404,7 @@ export async function assignNextSet(
     // Saturated pools, paused events, and deactivated judges are normal
     // outcomes. The old fallback walked every locked team over HTTP and
     // pinned the database once judges outnumbered teams/set_size.
-    if (isExpectedAssignmentError(message)) {
+    if (isExpectedAssignmentFailure(message)) {
       return null;
     }
 
